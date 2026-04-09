@@ -24,6 +24,10 @@ namespace WppQueuePoc.App
             SetCurrentQueue(null);
         }
         // Utilitário para exibir mensagens na caixa de saída
+        private void ClearOutput()
+        {
+            OutputTextBox.Clear();
+        }
         private void AppendOutput(string text)
         {
             OutputTextBox.AppendText($"{text}\n");
@@ -32,6 +36,7 @@ namespace WppQueuePoc.App
         // Utilitário async padrão
         private async Task ExecuteAsync(string commandName, Func<string> action)
         {
+            ClearOutput();
             StatusTextBlock.Text = $"Executando: {commandName}";
             try
             {
@@ -78,11 +83,13 @@ namespace WppQueuePoc.App
         }
         private void OnWppStatusClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var status = _wppStatusProvider.GetWppStatus();
             AppendOutput(status.ToString());
         }
         private void OnListQueuesClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var filas = _printSpoolerService.ListQueues();
             AppendOutput("Filas instaladas:");
             foreach (var fila in filas)
@@ -92,6 +99,7 @@ namespace WppQueuePoc.App
         }
         private void OnListPortsClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var ports = _printSpoolerService.ListPorts();
             AppendOutput("Portas:");
             foreach (var port in ports)
@@ -101,6 +109,7 @@ namespace WppQueuePoc.App
         }
         private void OnListDriversClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var drivers = _printSpoolerService.ListDrivers();
             AppendOutput("Drivers:");
             foreach (var driver in drivers)
@@ -110,6 +119,7 @@ namespace WppQueuePoc.App
         }
         private void OnListProcessorsClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var processors = _printSpoolerService.ListPrintProcessors();
             AppendOutput("Processadores:");
             foreach (var proc in processors)
@@ -119,6 +129,7 @@ namespace WppQueuePoc.App
         }
         private void OnListDataTypesClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var procName = PrintProcessorTextBox.Text;
             if (string.IsNullOrWhiteSpace(procName))
             {
@@ -134,6 +145,7 @@ namespace WppQueuePoc.App
         }
         private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var port = PortNameTextBox.Text;
             if (string.IsNullOrWhiteSpace(port))
             {
@@ -145,6 +157,7 @@ namespace WppQueuePoc.App
         }
         private void OnCreateQueueClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var queueName = QueueNameTextBox.Text;
             var driver = DriverNameTextBox.Text;
             var port = PortNameTextBox.Text;
@@ -158,6 +171,7 @@ namespace WppQueuePoc.App
         }
         private void OnUpdateQueueClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
             var queueName = ResolveQueueName(queueNameRaw, currQueue);
@@ -172,6 +186,7 @@ namespace WppQueuePoc.App
         }
         private void OnDeleteQueueClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
             var queueName = ResolveQueueName(queueNameRaw, currQueue);
