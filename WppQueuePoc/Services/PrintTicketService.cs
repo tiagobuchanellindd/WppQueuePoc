@@ -72,6 +72,72 @@ public sealed partial class PrintTicketService : IPrintTicketService
             DisposeIfPossible(localPrintServer);
         }
     }
+    public PrintTicketInfoResult GetUserTicketInfo(string queueName)
+    {
+        var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var localPrintServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
+        if (localPrintServerType is null)
+        {
+            return new PrintTicketInfoResult(
+                queueName,
+                Available: false,
+                Details: "System.Printing assembly is not available in this runtime.",
+                Attributes: attributes);
+        }
+        object? localPrintServer = null;
+        object? printQueue = null;
+        try
+        {
+            localPrintServer = Activator.CreateInstance(localPrintServerType);
+            if (localPrintServer is null)
+            {
+                return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", attributes);
+            }
+            var getPrintQueue = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
+            if (getPrintQueue is null)
+            {
+                return new PrintTicketInfoResult(queueName, false, "GetPrintQueue method not found.", attributes);
+            }
+            printQueue = getPrintQueue.Invoke(localPrintServer, new object[] { queueName });
+            if (printQueue is null)
+            {
+                return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", attributes);
+            }
+            var queueType = printQueue.GetType();
+            var userTicketProperty = queueType.GetProperty("UserPrintTicket");
+            var userTicket = userTicketProperty?.GetValue(printQueue);
+            if (userTicket is null)
+            {
+                return new PrintTicketInfoResult(queueName, false, "UserPrintTicket is not available.", attributes);
+            }
+            ReadTicketAttribute(userTicket, "OutputColor", attributes);
+            ReadTicketAttribute(userTicket, "PageMediaSize", attributes);
+            ReadTicketAttribute(userTicket, "PageOrientation", attributes);
+            ReadTicketAttribute(userTicket, "InputBin", attributes);
+            ReadTicketAttribute(userTicket, "Duplexing", attributes);
+            ReadTicketAttribute(userTicket, "CopyCount", attributes);
+            ReadTicketAttribute(userTicket, "Collation", attributes);
+            ReadTicketAttribute(userTicket, "Stapling", attributes);
+            return new PrintTicketInfoResult(
+                queueName,
+                Available: true,
+                Details: "User print ticket information captured.",
+                Attributes: attributes);
+        }
+        catch (Exception ex)
+        {
+            return new PrintTicketInfoResult(
+                queueName,
+                Available: false,
+                Details: $"Failed to read user print ticket information: {ex.Message}",
+                Attributes: attributes);
+        }
+        finally
+        {
+            DisposeIfPossible(printQueue);
+            DisposeIfPossible(localPrintServer);
+        }
+    }
     public PrintTicketUpdateResult UpdateDefaultTicket(string queueName, PrintTicketUpdateRequest request)
     => UpdatePrintTicketInternal(queueName, request, "DefaultPrintTicket", "Default");
     public PrintTicketUpdateResult UpdateUserTicket(string queueName, PrintTicketUpdateRequest request)
@@ -221,8 +287,5 @@ public sealed partial class PrintTicketService : IPrintTicketService
         (obj as IDisposable)?.Dispose();
     }
 
-    public PrintTicketInfoResult GetUserTicketInfo(string queueName)
-    {
-        throw new NotImplementedException();
-    }
+        
 }
