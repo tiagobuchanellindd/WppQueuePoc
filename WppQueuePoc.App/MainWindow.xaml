@@ -1,0 +1,109 @@
+﻿<Window x:Class="WppQueuePoc.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="WPP Queue POC App"
+        Height="760"
+        Width="1100"
+        MinHeight="640"
+        MinWidth="900">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <GroupBox Header="Inputs" Margin="0,0,0,10">
+            <Grid x:Name="InputPanel" Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Margin="0,0,8,8" VerticalAlignment="Center" Text="Queue" />
+                <TextBox x:Name="QueueNameTextBox" Grid.Row="0" Grid.Column="1" Margin="0,0,16,8" />
+
+                <TextBlock Grid.Row="0" Grid.Column="2" Margin="0,0,8,8" VerticalAlignment="Center" Text="Driver" />
+                <TextBox x:Name="DriverNameTextBox" Grid.Row="0" Grid.Column="3" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Margin="0,0,8,8" VerticalAlignment="Center" Text="Port" />
+                <TextBox x:Name="PortNameTextBox" Grid.Row="1" Grid.Column="1" Margin="0,0,16,8" />
+
+                <TextBlock Grid.Row="1" Grid.Column="2" Margin="0,0,8,8" VerticalAlignment="Center" Text="Comment" />
+                <TextBox x:Name="CommentTextBox" Grid.Row="1" Grid.Column="3" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Margin="0,0,8,8" VerticalAlignment="Center" Text="Location" />
+                <TextBox x:Name="LocationTextBox" Grid.Row="2" Grid.Column="1" Margin="0,0,16,8" />
+
+                <TextBlock Grid.Row="2" Grid.Column="2" Margin="0,0,8,8" VerticalAlignment="Center" Text="Processor" />
+                <TextBox x:Name="PrintProcessorTextBox" Grid.Row="2" Grid.Column="3" Margin="0,0,0,8" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center" Text="Datatype" />
+                <TextBox x:Name="DataTypeTextBox" Grid.Row="3" Grid.Column="1" Margin="0,0,16,0" />
+
+                <TextBlock Grid.Row="3" Grid.Column="2" Margin="0,0,8,0" VerticalAlignment="Center" Text="Ticket Duplexing" />
+                <TextBox x:Name="TicketDuplexingTextBox" Grid.Row="3" Grid.Column="3" Margin="0,0,0,0" ToolTip="Ex.: OneSided, TwoSidedLongEdge" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,8,8,0" VerticalAlignment="Center" Text="Ticket Color" />
+                <TextBox x:Name="TicketOutputColorTextBox" Grid.Row="4" Grid.Column="1" Margin="0,8,16,0" ToolTip="Ex.: Color, Monochrome" />
+
+                <TextBlock Grid.Row="4" Grid.Column="2" Margin="0,8,8,0" VerticalAlignment="Center" Text="Ticket Orientation" />
+                <TextBox x:Name="TicketOrientationTextBox" Grid.Row="4" Grid.Column="3" Margin="0,8,0,0" ToolTip="Ex.: Portrait, Landscape" />
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Grid.Row="1" Header="Commands" Margin="0,0,0,10">
+            <WrapPanel x:Name="CommandPanel" Margin="10">
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnNewQueueClick">new-queue</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnWppStatusClick">wpp-status</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListQueuesClick">list</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListPortsClick">list-ports</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDriversClick">list-drivers</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListProcessorsClick">list-processors</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDataTypesClick">list-datatypes</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnAddWsdPortClick">add-wsd-port</Button>
+                <Button x:Name="CreateQueueButton" Margin="0,0,8,8" Padding="10,5" Click="OnCreateQueueClick">create</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnUpdateQueueClick">update</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnDeleteQueueClick">delete</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnInspectQueueClick">inspect</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketInfoClick">ticket-info (default)</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketUserInfoClick">ticket-info (user)</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketDefaultUpdateClick">ticket-update-default</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketUserUpdateClick">ticket-update-user</Button>
+            </WrapPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Row="2" Header="Output" Margin="0,0,0,10">
+            <TextBox x:Name="OutputTextBox"
+                     Margin="10"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Auto"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas" />
+        </GroupBox>
+
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusTextBlock" Grid.Column="0" Text="Ready" />
+            <TextBlock x:Name="CurrentQueueTextBlock" Grid.Column="1" Text="Current queue: (none)" />
+        </Grid>
+    </Grid>
+</Window>

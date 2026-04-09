@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="WppQueuePoc/WppQueuePoc.csproj" />
+  <Project Path="WppQueuePoc.App/WppQueuePoc.App.csproj" />
+</Solution>
