@@ -68,6 +68,7 @@ namespace WppQueuePoc.App
         // ------------ Handlers ------------
         private void OnNewQueueClick(object sender, RoutedEventArgs e)
         {
+            ClearOutput();
             QueueNameTextBox.Text = "";
             DriverNameTextBox.Text = "";
             PortNameTextBox.Text = "";
@@ -143,18 +144,26 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {t}");
             }
         }
-        private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
-        {
-            ClearOutput();
-            var port = PortNameTextBox.Text;
-            if (string.IsNullOrWhiteSpace(port))
-            {
-                AppendOutput("Preencha o nome da porta WSD.");
-                return;
-            }
-            _printSpoolerService.AddWsdPort(port);
-            AppendOutput($"Porta WSD '{port}' adicionada.");
-        }
+private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
+{
+    ClearOutput();
+    var port = PortNameTextBox.Text;
+    if (string.IsNullOrWhiteSpace(port))
+    {
+        AppendOutput("Preencha o nome da porta WSD.");
+        return;
+    }
+    try
+    {
+        _printSpoolerService.AddWsdPort(port);
+        AppendOutput($"Porta WSD '{port}' adicionada.");
+    }
+    catch (Exception ex)
+    {
+        AppendOutput($"Erro ao adicionar porta WSD:\n{ex.Message}");
+        StatusTextBlock.Text = $"Erro (Add WSD Port)";
+    }
+}
         private void OnCreateQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
