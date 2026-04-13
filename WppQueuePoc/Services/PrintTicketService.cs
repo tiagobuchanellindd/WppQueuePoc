@@ -207,6 +207,7 @@ public sealed partial class PrintTicketService : IPrintTicketService
             bool changed = false;
             changed |= WriteTicketAttribute(ticket, "Duplexing", request.Duplexing);
             changed |= WriteTicketAttribute(ticket, "OutputColor", request.OutputColor);
+            changed |= WriteTicketAttribute(ticket, "PageOrientation", request.PageOrientation); // Now applies PageOrientation updates too!
             string commitError = null;
             if (changed)
             {
@@ -240,7 +241,7 @@ public sealed partial class PrintTicketService : IPrintTicketService
             // Result message
             string resultMsg = changed
                 ? (commitError == null ? "Ticket updated successfully." : $"Ticket update attempted. {commitError}")
-                : "No changes applied (all values same as before).";
+                : "No changes needed: the provided values matched current settings.";
 
             return new PrintTicketUpdateResult(
                 queueName,
@@ -284,34 +285,64 @@ public sealed partial class PrintTicketService : IPrintTicketService
         catch { /* best effort, ignore */ }
     }
     // Reflection utility for ticket writing
-    private static bool WriteTicketAttribute(object? ticket, string attrName, string? value)
+private static bool WriteTicketAttribute(object? ticket, string attrName, string? value)
+{
+    try
     {
-        try
-        {
-            if (ticket == null || string.IsNullOrWhiteSpace(value))
-                return false;
-            var type = ticket.GetType();
-            var prop = type.GetProperty(attrName);
-            if (prop == null || !prop.CanWrite) return false;
-            // Attempt to convert value if needed (string parsing)
-            var targetType = prop.PropertyType;
-            object? realValue = ConvertIfPossible(targetType, value);
-            prop.SetValue(ticket, realValue);
-            return true;
-        }
-        catch { return false; }
+        if (ticket == null || string.IsNullOrWhiteSpace(value))
+            return false;
+        var type = ticket.GetType();
+        var prop = type.GetProperty(attrName);
+        if (prop == null || !prop.CanWrite) return false;
+
+        // Obtain the current value
+        var currentValue = prop.GetValue(ticket);
+        var targetType = prop.PropertyType;
+        object? realValue = ConvertIfPossible(targetType, value);
+
+        // Compare by string representation for enums/strings, deep equals otherwise
+        bool isDifferent;
+        if (currentValue is null && realValue is not null) isDifferent = true;
+        else if (currentValue is not null && realValue is null) isDifferent = true;
+        else if (currentValue is null && realValue is null) isDifferent = false;
+        else if (targetType == typeof(string) || targetType.IsEnum)
+            isDifferent = !string.Equals(currentValue?.ToString()?.Trim(), realValue?.ToString()?.Trim(), StringComparison.OrdinalIgnoreCase);
+        else
+            isDifferent = !Equals(currentValue, realValue);
+
+        if (!isDifferent)
+            return false;
+
+        prop.SetValue(ticket, realValue);
+        return true;
     }
+    catch { return false; }
+}
     private static object? ConvertIfPossible(Type targetType, string value)
     {
         try
         {
-            if (targetType.IsEnum)
-                return Enum.Parse(targetType, value, ignoreCase: true);
-            return System.Convert.ChangeType(value, targetType);
+            // Handle Nullable<T> for enums and value types
+            var isNullable = targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>);
+            var underlyingType = isNullable ? Nullable.GetUnderlyingType(targetType) : null;
+
+            if (isNullable && string.IsNullOrWhiteSpace(value))
+                return null;
+            if ((underlyingType ?? targetType).IsEnum)
+            {
+                var enumType = (underlyingType ?? targetType);
+                return Enum.Parse(enumType, value, ignoreCase: true);
+            }
+            // Handle common value type conversion, including underlying types for nullables
+            var realType = underlyingType ?? targetType;
+            return System.Convert.ChangeType(value, realType);
         }
         catch
         {
-            return value; // fallback: set string
+            // Only fallback for string destination; otherwise throw
+            if (targetType == typeof(string) || (Nullable.GetUnderlyingType(targetType) == typeof(string)))
+                return value;
+            throw;
         }
     }
     private static void DisposeIfPossible(object? obj)

@@ -318,7 +318,10 @@ sb.AppendLine("Update completed successfully!");
             }
             else
             {
-                sb.AppendLine("Error updating ticket: " + result.Details);
+                if (result.Details.Contains("No changes needed"))
+                    sb.AppendLine("No update required: values already set.");
+                else
+                    sb.AppendLine("Error updating ticket: " + result.Details);
             }
             return sb.ToString();
         }
