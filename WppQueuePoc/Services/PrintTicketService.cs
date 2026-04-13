@@ -186,35 +186,67 @@ public sealed partial class PrintTicketService : IPrintTicketService
                     new Dictionary<string, string>());
             var queueType = printQueue.GetType();
             var ticketProperty = queueType.GetProperty(ticketTypeProperty);
-            var ticket = ticketProperty?.GetValue(printQueue);
+            if(ticketProperty == null)
+                return new PrintTicketUpdateResult(
+                    queueName,
+                    scope,
+                    false,
+                    $"Print ticket property '{ticketTypeProperty}' not found.",
+                    requested,
+                    new Dictionary<string, string>());
+            var ticket = ticketProperty.GetValue(printQueue);
             if (ticket is null)
                 return new PrintTicketUpdateResult(
                     queueName,
                     scope,
                     false,
-                    $"Print ticket '{ticketTypeProperty}' not found.",
+                    $"Print ticket '{ticketTypeProperty}' not found (might be unsupported by this driver or printer type).",
                     requested,
                     new Dictionary<string, string>());
             // Aplica os atributos
             bool changed = false;
             changed |= WriteTicketAttribute(ticket, "Duplexing", request.Duplexing);
             changed |= WriteTicketAttribute(ticket, "OutputColor", request.OutputColor);
+            string commitError = null;
             if (changed)
             {
-                // Salva no spooler
-                var commit = queueType.GetMethod("Commit");
-                commit?.Invoke(printQueue, null);
+                try
+                {
+                    // Always set the ticket back per MS documentation!
+                    ticketProperty.SetValue(printQueue, ticket);
+                }
+                catch(Exception setEx)
+                {
+                    commitError = $"Failed to set updated ticket back on '{ticketTypeProperty}': {setEx.Message}";
+                }
+
+                try
+                {
+                    // Only commit after set
+                    var commit = queueType.GetMethod("Commit");
+                    commit?.Invoke(printQueue, null);
+                }
+                catch(Exception commitEx)
+                {
+                    // Capture possible commit failure
+                    commitError = $"Commit failed: {commitEx.Message}";
+                }
             }
             // Lê os valores efetivos após possível commit/aplicação
             var applied = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             ReadTicketAttribute(ticket, "Duplexing", applied);
             ReadTicketAttribute(ticket, "OutputColor", applied);
             ReadTicketAttribute(ticket, "PageOrientation", applied);
+            // Result message
+            string resultMsg = changed
+                ? (commitError == null ? "Ticket updated successfully." : $"Ticket update attempted. {commitError}")
+                : "No changes applied (all values same as before).";
+
             return new PrintTicketUpdateResult(
                 queueName,
                 scope,
                 changed,
-                changed ? "Ticket updated successfully." : "No changes applied (all values same as before).",
+                resultMsg,
                 requested,
                 applied);
         }
@@ -224,7 +256,7 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 queueName,
                 scope,
                 false,
-                $"Exception: {ex.Message}",
+                $"Exception during PrintTicket update: {ex.Message}. This may occur if the printer driver does not support programmatic changes to the default or user print ticket.",
                 requested,
                 new Dictionary<string, string>());
         }
