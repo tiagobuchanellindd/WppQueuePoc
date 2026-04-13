@@ -22,17 +22,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
         object? printQueue = null;
         try
         {
-            localPrintServer = Activator.CreateInstance(localPrintServerType);
+            localPrintServer = CreateLocalPrintServer(localPrintServerType, "AdministrateServer");
             if (localPrintServer is null)
             {
                 return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", attributes);
             }
-            var getPrintQueue = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
-            if (getPrintQueue is null)
-            {
-                return new PrintTicketInfoResult(queueName, false, "GetPrintQueue method not found.", attributes);
-            }
-            printQueue = getPrintQueue.Invoke(localPrintServer, new object[] { queueName });
+            printQueue = GetPrintQueue(localPrintServerType, localPrintServer, queueName, "DefaultPrintTicket", "AdministratePrinter");
             if (printQueue is null)
             {
                 return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", attributes);
@@ -88,17 +83,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
         object? printQueue = null;
         try
         {
-            localPrintServer = Activator.CreateInstance(localPrintServerType);
+            localPrintServer = CreateLocalPrintServer(localPrintServerType, "AdministrateServer");
             if (localPrintServer is null)
             {
                 return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", attributes);
             }
-            var getPrintQueue = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
-            if (getPrintQueue is null)
-            {
-                return new PrintTicketInfoResult(queueName, false, "GetPrintQueue method not found.", attributes);
-            }
-            printQueue = getPrintQueue.Invoke(localPrintServer, new object[] { queueName });
+            printQueue = GetPrintQueue(localPrintServerType, localPrintServer, queueName, "UserPrintTicket", "AdministratePrinter");
             if (printQueue is null)
             {
                 return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", attributes);
@@ -173,9 +163,8 @@ public sealed partial class PrintTicketService : IPrintTicketService
         object? printQueue = null;
         try
         {
-            localPrintServer = Activator.CreateInstance(localPrintServerType);
-            var getPrintQueue = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
-            printQueue = getPrintQueue?.Invoke(localPrintServer, new object[] { queueName });
+            localPrintServer = CreateLocalPrintServer(localPrintServerType, "AdministrateServer");
+            printQueue = GetPrintQueue(localPrintServerType, localPrintServer, queueName, ticketTypeProperty, "AdministratePrinter");
             if (printQueue is null)
                 return new PrintTicketUpdateResult(
                     queueName,
@@ -208,7 +197,7 @@ public sealed partial class PrintTicketService : IPrintTicketService
             changed |= WriteTicketAttribute(ticket, "Duplexing", request.Duplexing);
             changed |= WriteTicketAttribute(ticket, "OutputColor", request.OutputColor);
             changed |= WriteTicketAttribute(ticket, "PageOrientation", request.PageOrientation); // Now applies PageOrientation updates too!
-            string commitError = null;
+            string? commitError = null;
             if (changed)
             {
                 try
@@ -218,7 +207,8 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 }
                 catch(Exception setEx)
                 {
-                    commitError = $"Failed to set updated ticket back on '{ticketTypeProperty}': {setEx.Message}";
+                    var error = GetInnermostMessage(setEx);
+                    commitError = $"Failed to set updated ticket back on '{ticketTypeProperty}': {error}";
                 }
 
                 try
@@ -230,7 +220,8 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 catch(Exception commitEx)
                 {
                     // Capture possible commit failure
-                    commitError = $"Commit failed: {commitEx.Message}";
+                    var error = GetInnermostMessage(commitEx);
+                    commitError = $"Commit failed: {error}";
                 }
             }
             // Lê os valores efetivos após possível commit/aplicação
@@ -253,11 +244,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
         }
         catch (Exception ex)
         {
+            var error = GetInnermostMessage(ex);
             return new PrintTicketUpdateResult(
                 queueName,
                 scope,
                 false,
-                $"Exception during PrintTicket update: {ex.Message}. This may occur if the printer driver does not support programmatic changes to the default or user print ticket.",
+                $"Exception during PrintTicket update: {error}. This may occur if the process is not elevated and/or the account does not have 'Manage Printers' permission on this queue.",
                 requested,
                 new Dictionary<string, string>());
         }
@@ -348,6 +340,72 @@ private static bool WriteTicketAttribute(object? ticket, string attrName, string
     private static void DisposeIfPossible(object? obj)
     {
         (obj as IDisposable)?.Dispose();
+    }
+
+    private static object? CreateLocalPrintServer(Type localPrintServerType, string desiredAccessName)
+    {
+        try
+        {
+            var desiredAccessType = Type.GetType("System.Printing.PrintSystemDesiredAccess, System.Printing", throwOnError: false);
+            if (desiredAccessType is null)
+                return Activator.CreateInstance(localPrintServerType);
+
+            var desiredAccess = Enum.Parse(desiredAccessType, desiredAccessName, ignoreCase: true);
+            var ctor = localPrintServerType.GetConstructor(new[] { desiredAccessType });
+            if (ctor is null)
+                return Activator.CreateInstance(localPrintServerType);
+
+            return ctor.Invoke(new[] { desiredAccess });
+        }
+        catch
+        {
+            return Activator.CreateInstance(localPrintServerType);
+        }
+    }
+
+    private static object? GetPrintQueue(
+        Type localPrintServerType,
+        object? localPrintServer,
+        string queueName,
+        string ticketProperty,
+        string desiredAccessName)
+    {
+        if (localPrintServer is null)
+            return null;
+
+        var desiredAccessType = Type.GetType("System.Printing.PrintSystemDesiredAccess, System.Printing", throwOnError: false);
+        if (desiredAccessType is not null)
+        {
+            var desiredAccess = Enum.Parse(desiredAccessType, desiredAccessName, ignoreCase: true);
+
+            var printQueueType = Type.GetType("System.Printing.PrintQueue, System.Printing", throwOnError: false);
+            var printServerType = Type.GetType("System.Printing.PrintServer, System.Printing", throwOnError: false);
+            if (printQueueType is not null && printServerType is not null && printServerType.IsInstanceOfType(localPrintServer))
+            {
+                var ctor = printQueueType.GetConstructor(new[] { printServerType, typeof(string), desiredAccessType });
+                if (ctor is not null)
+                    return ctor.Invoke(new object[] { localPrintServer, queueName, desiredAccess });
+            }
+        }
+
+        var getQueueWithProperties = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string), typeof(string[]) });
+        if (getQueueWithProperties is not null)
+        {
+            var properties = new[] { ticketProperty };
+            return getQueueWithProperties.Invoke(localPrintServer, new object[] { queueName, properties });
+        }
+
+        var getQueueDefault = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
+        return getQueueDefault?.Invoke(localPrintServer, new object[] { queueName });
+    }
+
+    private static string GetInnermostMessage(Exception ex)
+    {
+        var current = ex;
+        while (current.InnerException is not null)
+            current = current.InnerException;
+
+        return current.Message;
     }
 
         
