@@ -4,8 +4,24 @@ using System;
 using System.Collections.Generic;
 namespace WppQueuePoc.Services;
 
+/// <summary>
+/// Service responsavel por ler e atualizar PrintTicket de filas de impressao.
+///
+/// A implementacao usa reflection sobre <c>System.Printing</c> para evitar
+/// dependencia estatica forte da API WPF/Printing em todos os ambientes.
+/// Com isso, o codigo tenta operar quando a montagem esta disponivel e,
+/// quando nao estiver, retorna resultados descritivos sem quebrar o fluxo.
+/// </summary>
 public sealed partial class PrintTicketService : IPrintTicketService
 {
+    /// <summary>
+    /// Le os atributos principais do <c>DefaultPrintTicket</c> de uma fila.
+    ///
+    /// O metodo valida disponibilidade de <c>System.Printing</c>, abre o
+    /// <c>LocalPrintServer</c>, localiza a fila e extrai propriedades comuns
+    /// do ticket (cor, orientacao, duplex, etc.). O retorno sempre vem em
+    /// <see cref="PrintTicketInfoResult"/>, inclusive em cenarios de erro.
+    /// </summary>
     public PrintTicketInfoResult GetDefaultTicketInfo(string queueName)
     {
         var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -67,6 +83,14 @@ public sealed partial class PrintTicketService : IPrintTicketService
             DisposeIfPossible(localPrintServer);
         }
     }
+
+    /// <summary>
+    /// Le os atributos principais do <c>UserPrintTicket</c> de uma fila.
+    ///
+    /// A logica segue o mesmo fluxo de leitura do ticket padrao, mas usa o
+    /// escopo de preferencias do usuario. Isso permite comparar configuracoes
+    /// efetivas por escopo (Default vs User) para diagnostico e aprendizado.
+    /// </summary>
     public PrintTicketInfoResult GetUserTicketInfo(string queueName)
     {
         var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -128,12 +152,34 @@ public sealed partial class PrintTicketService : IPrintTicketService
             DisposeIfPossible(localPrintServer);
         }
     }
+
+    /// <summary>
+    /// Atualiza o <c>DefaultPrintTicket</c> da fila com os valores solicitados.
+    ///
+    /// Encaminha para o fluxo interno comum de atualizacao, fixando o escopo
+    /// "Default" e a propriedade alvo do ticket.
+    /// </summary>
     public PrintTicketUpdateResult UpdateDefaultTicket(string queueName, PrintTicketUpdateRequest request)
     => UpdatePrintTicketInternal(queueName, request, "DefaultPrintTicket", "Default");
+
+    /// <summary>
+    /// Atualiza o <c>UserPrintTicket</c> da fila com os valores solicitados.
+    ///
+    /// Encaminha para o fluxo interno comum de atualizacao, fixando o escopo
+    /// "User" e a propriedade alvo do ticket.
+    /// </summary>
     public PrintTicketUpdateResult UpdateUserTicket(string queueName, PrintTicketUpdateRequest request)
         => UpdatePrintTicketInternal(queueName, request, "UserPrintTicket", "User");
 
-    // Core updater for both default/user ticket
+    /// <summary>
+    /// Executa o fluxo central de atualizacao de PrintTicket para um escopo.
+    ///
+    /// O metodo: (1) prepara os atributos solicitados, (2) abre servidor/fila,
+    /// (3) le o ticket alvo, (4) aplica apenas diferencas detectadas,
+    /// (5) reatribui o ticket e faz <c>Commit</c>, e (6) retorna o que foi
+    /// solicitado versus o que ficou aplicado. Erros sao capturados e
+    /// transformados em mensagem explicativa no resultado.
+    /// </summary>
     private PrintTicketUpdateResult UpdatePrintTicketInternal(
     string queueName,
     PrintTicketUpdateRequest request,
@@ -260,7 +306,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
         }
     }
 
-    // Reflection utility for ticket reading
+    /// <summary>
+    /// Le uma propriedade do ticket por reflection e grava no dicionario de saida.
+    ///
+    /// A leitura e best-effort: se a propriedade nao existir ou ocorrer excecao,
+    /// o metodo ignora a falha para nao interromper a coleta dos demais atributos.
+    /// </summary>
     private static void ReadTicketAttribute(object? ticket, string attrName, IDictionary<string, string> output)
     {
         try
@@ -276,7 +327,14 @@ public sealed partial class PrintTicketService : IPrintTicketService
         }
         catch { /* best effort, ignore */ }
     }
-    // Reflection utility for ticket writing
+
+    /// <summary>
+    /// Tenta escrever um atributo no ticket apenas quando houver mudanca real.
+    ///
+    /// Converte o valor string para o tipo da propriedade (incluindo enum e
+    /// nullable), compara com o valor atual e retorna <see langword="true"/>
+    /// apenas quando uma alteracao efetiva foi aplicada.
+    /// </summary>
     private static bool WriteTicketAttribute(object? ticket, string attrName, string? value)
 {
     try
@@ -309,7 +367,15 @@ public sealed partial class PrintTicketService : IPrintTicketService
         return true;
     }
     catch { return false; }
-}
+    }
+
+    /// <summary>
+    /// Converte string para o tipo de destino da propriedade do ticket.
+    ///
+    /// Suporta enums, tipos primitivos e <c>Nullable&lt;T&gt;</c>. Se a conversao
+    /// falhar e o destino for string, preserva o valor original; caso contrario,
+    /// propaga a excecao para o chamador decidir o tratamento.
+    /// </summary>
     private static object? ConvertIfPossible(Type targetType, string value)
     {
         try
@@ -337,11 +403,24 @@ public sealed partial class PrintTicketService : IPrintTicketService
             throw;
         }
     }
+
+    /// <summary>
+    /// Descarta o objeto quando ele implementa <see cref="IDisposable"/>.
+    ///
+    /// Helper para limpeza segura de instancias criadas por reflection.
+    /// </summary>
     private static void DisposeIfPossible(object? obj)
     {
         (obj as IDisposable)?.Dispose();
     }
 
+    /// <summary>
+    /// Cria uma instancia de <c>LocalPrintServer</c> com acesso desejado.
+    ///
+    /// Tenta usar o construtor que recebe <c>PrintSystemDesiredAccess</c>.
+    /// Se o tipo/acesso nao estiver disponivel, faz fallback para construtor
+    /// padrao para maximizar compatibilidade entre ambientes.
+    /// </summary>
     private static object? CreateLocalPrintServer(Type localPrintServerType, string desiredAccessName)
     {
         try
@@ -363,6 +442,13 @@ public sealed partial class PrintTicketService : IPrintTicketService
         }
     }
 
+    /// <summary>
+    /// Obtem a fila de impressao por nome, com fallback entre estrategias.
+    ///
+    /// Prioriza criacao direta de <c>PrintQueue</c> com acesso explicito.
+    /// Quando isso nao e possivel, tenta <c>GetPrintQueue</c> com lista de
+    /// propriedades e, por fim, a sobrecarga simples por nome.
+    /// </summary>
     private static object? GetPrintQueue(
         Type localPrintServerType,
         object? localPrintServer,
@@ -399,6 +485,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
         return getQueueDefault?.Invoke(localPrintServer, new object[] { queueName });
     }
 
+    /// <summary>
+    /// Retorna a mensagem da excecao mais interna da cadeia.
+    ///
+    /// Util para expor causa raiz de erros de reflection/invocacao sem trazer
+    /// o stack trace completo para o resultado funcional.
+    /// </summary>
     private static string GetInnermostMessage(Exception ex)
     {
         var current = ex;

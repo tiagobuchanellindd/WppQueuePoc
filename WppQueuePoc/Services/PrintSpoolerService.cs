@@ -9,14 +9,30 @@ using WppQueuePoc.Models;
 namespace WppQueuePoc.Services;
 
 /// <summary>
-/// Implementação de administração de filas via Winspool.
-/// Esta classe materializa o fluxo de negócio da POC (criar, listar, atualizar, excluir e inspecionar).
+/// Serviço de administração de impressão baseado em Winspool (API nativa do Windows).
+///
+/// Esta classe centraliza os casos de uso da POC para filas de impressão:
+/// criação, atualização, exclusão, enumeração de recursos (filas, portas,
+/// drivers, processadores e datatypes) e inspeção heurística de aderência a WPP.
+///
+/// Em termos técnicos, o serviço encapsula chamadas nativas via P/Invoke,
+/// gerencia buffers não gerenciados, converte estruturas Win32 para modelos
+/// de domínio e padroniza erros em exceções mais explicativas para o aplicativo.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : IPrintSpoolerService
 {
     /// <summary>
-    /// Tenta criar uma porta WSD usando o monitor nativo do Windows.
+    /// Tenta criar uma porta WSD no spooler usando o canal administrativo XcvMonitor.
+    ///
+    /// O método primeiro verifica idempotência (porta já existente) e, se necessário,
+    /// envia o comando nativo <c>AddPort</c> ao monitor "WSD Port". Mesmo quando a
+    /// chamada Win32 retorna sucesso, também valida o código de status devolvido pelo
+    /// monitor para distinguir sucesso real de rejeições funcionais.
+    ///
+    /// Em ambientes onde a criação direta não é suportada (por exemplo,
+    /// <c>ERROR_NOT_SUPPORTED</c>), o método lança erro orientando o uso de fluxo de
+    /// descoberta/reuso de portas existentes.
     /// </summary>
     public void AddWsdPort(string portName)
     {
@@ -80,7 +96,14 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Cria uma nova fila no spooler com os parâmetros informados.
+    /// Cria uma nova fila de impressão no spooler com os parâmetros informados.
+    ///
+    /// Monta uma estrutura <c>PRINTER_INFO_2</c> com os metadados da fila
+    /// (nome, porta, driver, processador, datatype e propriedades descritivas),
+    /// aloca memória não gerenciada para interoperabilidade e chama <c>AddPrinter</c>.
+    ///
+    /// Se o spooler recusar a operação, converte o último erro Win32 em exceção.
+    /// Ao final, garante liberação de handle e memória alocada, mesmo em caso de falha.
     /// </summary>
     public void CreateQueue(
         string queueName,
@@ -141,7 +164,11 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lista filas locais/conectadas com dados úteis para operação.
+    /// Lista filas locais e conexões de impressora com campos úteis para operação.
+    ///
+    /// Internamente enumera dados no nível <c>PRINTER_INFO_2</c>, projeta para o
+    /// modelo <see cref="QueueInfo"/>, normaliza valores nulos para string vazia
+    /// e ordena alfabeticamente por nome para facilitar consumo em CLI/UI.
     /// </summary>
     public IReadOnlyList<QueueInfo> ListQueues()
     {
@@ -159,7 +186,11 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lista portas de impressão disponíveis no host.
+    /// Lista portas de impressão registradas no host.
+    ///
+    /// Executa o padrão Win32 de duas chamadas: primeiro consulta o tamanho de buffer
+    /// necessário, depois lê o bloco com <c>PORT_INFO_1</c>. Em seguida, converte cada
+    /// item para nome de porta, filtra entradas inválidas e retorna a coleção ordenada.
     /// </summary>
     public IReadOnlyList<string> ListPorts()
     {
@@ -224,7 +255,11 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lista drivers de impressão instalados.
+    /// Lista drivers de impressão instalados no sistema.
+    ///
+    /// Usa <c>EnumPrinterDrivers</c> (nível 2) para obter <c>DRIVER_INFO_2</c>,
+    /// extrai os nomes válidos e devolve uma lista ordenada, pronta para seleção
+    /// em fluxos de criação/atualização de fila.
     /// </summary>
     public IReadOnlyList<string> ListDrivers()
     {
@@ -291,7 +326,11 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lista processadores de impressão registrados.
+    /// Lista processadores de impressão registrados no spooler.
+    ///
+    /// O método enumera estruturas <c>PRINTPROCESSOR_INFO_1</c>, extrai apenas
+    /// nomes não vazios e organiza o retorno em ordem alfabética, servindo de base
+    /// para descobrir quais datatypes cada processador suporta.
     /// </summary>
     public IReadOnlyList<string> ListPrintProcessors()
     {
@@ -361,7 +400,14 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lista datatypes disponíveis para o processador informado.
+    /// Lista os datatypes disponíveis para um processador de impressão específico.
+    ///
+    /// Valida a entrada, consulta o spooler com
+    /// <c>EnumPrintProcessorDatatypes</c> (nível 1), converte as estruturas
+    /// <c>DATATYPES_INFO_1</c> para strings e retorna os nomes ordenados.
+    ///
+    /// Este método é útil para montar combinações válidas de
+    /// processador + datatype durante criação ou atualização de filas.
     /// </summary>
     public IReadOnlyList<string> ListDataTypes(string printProcessor)
     {
@@ -434,7 +480,14 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Atualiza propriedades de uma fila existente.
+    /// Atualiza propriedades de uma fila existente de forma parcial.
+    ///
+    /// Lê o estado atual da fila, aplica somente os campos informados
+    /// (rename, driver, porta, comentário e localização), valida se há mudanças
+    /// reais e persiste no spooler via <c>SetPrinter</c> com acesso administrativo.
+    ///
+    /// Também zera ponteiros sensíveis da estrutura para evitar reutilização indevida
+    /// de dados nativos e garante liberação de recursos em todas as saídas.
     /// </summary>
     public void UpdateQueue(string queueName, string? newQueueName, string? newDriverName, string? newPortName, string? comment, string? location)
     {
@@ -521,7 +574,12 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Exclui uma fila do spooler.
+    /// Exclui uma fila do spooler usando handle com permissões elevadas.
+    ///
+    /// O método abre a fila com <c>PRINTER_ALL_ACCESS</c> e chama
+    /// <c>DeletePrinter</c>. Em caso de falha, traduz o erro Win32 para mensagem
+    /// mais acionável (por exemplo, acesso negado por falta de elevação ou console
+    /// de gerenciamento aberto bloqueando a operação).
     /// </summary>
     public void DeleteQueue(string queueName)
     {
@@ -562,7 +620,15 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Inspeciona a fila e aplica regra heurística de classificação WPP.
+    /// Inspeciona uma fila e aplica heurística para classificar aderência provável a WPP.
+    ///
+    /// A classificação combina três fontes de evidência:
+    /// estado global de WPP, padrão do nome de porta (ex.: WSD*) e dados opcionais
+    /// de APMON (protocolo/URL) quando disponíveis. O resultado é retornado em
+    /// <see cref="QueueInspectionResult"/> com diagnóstico textual para auditoria.
+    ///
+    /// Importante: trata-se de inferência orientada por sinais operacionais,
+    /// não de prova definitiva de conformidade.
     /// </summary>
     public QueueInspectionResult InspectQueue(string queueName)
     {
@@ -617,7 +683,10 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Converte código de protocolo APMON para nome legível.
+    /// Converte o código numérico de protocolo APMON para rótulo legível.
+    ///
+    /// Mapeia os códigos conhecidos usados pela POC (WSD e IPP) e retorna
+    /// "Unknown" para valores fora do catálogo atual.
     /// </summary>
     private static string ProtocolToString(uint protocol)
     {
@@ -630,7 +699,12 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Tenta coletar evidências APMON da porta (protocolo/URL) sem falhar a inspeção.
+    /// Tenta coletar metadados APMON da porta (protocolo e URL do dispositivo/serviço).
+    ///
+    /// Abre um canal XcvPort para a porta informada e executa o comando
+    /// <c>GetAPPortInfo</c>. Se qualquer etapa falhar (porta inválida, monitor
+    /// indisponível, erro de comando), retorna <see langword="null"/> para manter a
+    /// inspeção resiliente, sem interromper o fluxo principal.
     /// </summary>
     private static ApPortData? TryGetApPortInfo(string portName)
     {
@@ -695,7 +769,11 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lê a estrutura completa da fila pelo nível 2 do Winspool.
+    /// Lê a configuração completa de uma fila pelo nível 2 do Winspool.
+    ///
+    /// Abre a fila, consulta o tamanho necessário de buffer e recupera uma
+    /// estrutura <c>PRINTER_INFO_2</c> com metadados completos (driver, porta,
+    /// atributos, comentários etc.). É a base para cenários de inspeção e update.
     /// </summary>
     private static NativeMethods.PRINTER_INFO_2 GetQueueInfo(string queueName)
     {
@@ -748,7 +826,11 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Enumera filas locais e conexões usando PRINTER_INFO_2.
+    /// Enumera filas locais e conexões de impressora no nível <c>PRINTER_INFO_2</c>.
+    ///
+    /// Executa a estratégia de dupla chamada para obter buffer nativo,
+    /// converte cada entrada para estrutura gerenciada e devolve a lista bruta,
+    /// que será posteriormente projetada para modelos de domínio.
     /// </summary>
     private static List<NativeMethods.PRINTER_INFO_2> EnumeratePrinterInfo2()
     {
@@ -809,7 +891,10 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     }
 
     /// <summary>
-    /// Lança uma exceção Win32 com o último erro nativo registrado.
+    /// Lança uma <see cref="Win32Exception"/> usando o último erro nativo da thread.
+    ///
+    /// Este helper padroniza o tratamento de falhas de interoperabilidade,
+    /// anexando um contexto funcional à mensagem para facilitar diagnóstico.
     /// </summary>
     private static void ThrowLastWin32(string context)
     {
