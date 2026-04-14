@@ -145,26 +145,26 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {t}");
             }
         }
-private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
-{
-    ClearOutput();
-    var port = PortNameTextBox.Text;
-    if (string.IsNullOrWhiteSpace(port))
-    {
-        AppendOutput("Please enter the WSD port name.");
-        return;
-    }
-    try
-    {
-        _printSpoolerService.AddWsdPort(port);
-        AppendOutput($"WSD port '{port}' added.");
-    }
-    catch (Exception ex)
-    {
-AppendOutput($"Error adding WSD port:\n{ex.Message}");
-        StatusTextBlock.Text = $"Error (Add WSD Port)";
-    }
-}
+        private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
+        {
+            ClearOutput();
+            var port = PortNameTextBox.Text;
+            if (string.IsNullOrWhiteSpace(port))
+            {
+                AppendOutput("Please enter the WSD port name.");
+                return;
+            }
+            try
+            {
+                _printSpoolerService.AddWsdPort(port);
+                AppendOutput($"WSD port '{port}' added.");
+            }
+            catch (Exception ex)
+            {
+        AppendOutput($"Error adding WSD port:\n{ex.Message}");
+                StatusTextBlock.Text = $"Error (Add WSD Port)";
+            }
+        }
         private void OnCreateQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -175,6 +175,11 @@ AppendOutput($"Error adding WSD port:\n{ex.Message}");
             var dataType = DataTypeTextBox.Text;
             var comment = CommentTextBox.Text;
             var location = LocationTextBox.Text;
+            if (string.IsNullOrWhiteSpace(queueName) || string.IsNullOrWhiteSpace(driver) || string.IsNullOrWhiteSpace(port) || string.IsNullOrWhiteSpace(processor) || string.IsNullOrWhiteSpace(dataType))
+            {
+                AppendOutput("Please fill in all required fields: Queue Name, Driver Name, Port Name, Print Processor, Data Type.");
+                return;
+            }
             _printSpoolerService.CreateQueue(queueName, driver, port, processor, dataType, comment, location);
             AppendOutput($"Queue '{queueName}' created.");
             SetCurrentQueue(queueName);
@@ -190,6 +195,11 @@ AppendOutput($"Error adding WSD port:\n{ex.Message}");
             var newPortName = NormalizeOptional(PortNameTextBox.Text);
             var comment = NormalizeOptional(CommentTextBox.Text);
             var location = NormalizeOptional(LocationTextBox.Text);
+            if (string.IsNullOrWhiteSpace(queueName))
+            {
+                AppendOutput("Please specify the current queue name to update.");
+                return;
+            }
             _printSpoolerService.UpdateQueue(queueName, newQueueName, newDriverName, newPortName, comment, location);
             AppendOutput($"Queue '{queueName}' updated.");
             SetCurrentQueue(newQueueName);
@@ -199,6 +209,11 @@ AppendOutput($"Error adding WSD port:\n{ex.Message}");
             ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
+            if (string.IsNullOrWhiteSpace(_currentQueueName))
+            {
+                AppendOutput("Please specify the current queue name to delete.");
+                return;
+            }
             var queueName = ResolveQueueName(queueNameRaw, currQueue);
             _printSpoolerService.DeleteQueue(queueName);
             AppendOutput($"Queue '{queueName}' deleted.");

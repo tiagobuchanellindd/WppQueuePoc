@@ -67,22 +67,22 @@
 
         <GroupBox Grid.Row="1" Header="Commands" Margin="0,0,0,10">
             <WrapPanel x:Name="CommandPanel" Margin="10">
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnNewQueueClick">new-queue</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnWppStatusClick">wpp-status</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListQueuesClick">list</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListPortsClick">list-ports</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDriversClick">list-drivers</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListProcessorsClick">list-processors</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDataTypesClick">list-datatypes</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnAddWsdPortClick">add-wsd-port</Button>
-                <Button x:Name="CreateQueueButton" Margin="0,0,8,8" Padding="10,5" Click="OnCreateQueueClick">create</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnUpdateQueueClick">update</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnDeleteQueueClick">delete</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnInspectQueueClick">inspect</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketInfoClick">ticket-info (default)</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketUserInfoClick">ticket-info (user)</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketDefaultUpdateClick">ticket-update-default</Button>
-                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketUserUpdateClick">ticket-update-user</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnNewQueueClick">Clear</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnWppStatusClick">WPP-status</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListQueuesClick">List Queues</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListPortsClick">List Ports</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDriversClick">List Drivers</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListProcessorsClick">List Processors</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDataTypesClick">List Data Types</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnAddWsdPortClick">Add WSD Port</Button>
+                <Button x:Name="CreateQueueButton" Margin="0,0,8,8" Padding="10,5" Click="OnCreateQueueClick">Create Queue</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnUpdateQueueClick">Update Queue</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnDeleteQueueClick">Delete Queue</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnInspectQueueClick">Inspect Queue</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketInfoClick">Ticket Info (Default)</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketUserInfoClick">Ticket Info (User)</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketDefaultUpdateClick">Ticket Update (Default)</Button>
+                <Button Margin="0,0,8,8" Padding="10,5" Click="OnTicketUserUpdateClick">Ticket Update (User)</Button>
             </WrapPanel>
         </GroupBox>
 
