@@ -1,10 +1,10 @@
 using System.ComponentModel;
+using System.Linq;
 using System.Text;
 using System.Windows;
 using WppQueuePoc.Abstractions;
 using WppQueuePoc.Models;
 using WppQueuePoc.Services;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 
 namespace WppQueuePoc.App
 {
@@ -24,17 +24,62 @@ namespace WppQueuePoc.App
             DataTypeTextBox.Text = "RAW";
             SetCurrentQueue(null);
         }
-        // Utilitário para exibir mensagens na caixa de saída
+
         private void ClearOutput()
         {
             OutputTextBox.Clear();
         }
+
         private void AppendOutput(string text)
         {
             OutputTextBox.AppendText($"{text}\n");
             OutputTextBox.ScrollToEnd();
         }
-        // Utilitário async padrão
+
+        private bool ShowValidationWarning(string commandName, string message)
+        {
+            AppendOutput(message);
+            StatusTextBlock.Text = $"Validation warning ({commandName})";
+            MessageBox.Show(this, message, "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        private bool ValidateRequiredFields(string commandName, params (string FieldName, string? Value)[] fields)
+        {
+            var missingFields = fields
+                .Where(field => string.IsNullOrWhiteSpace(field.Value))
+                .Select(field => field.FieldName)
+                .ToArray();
+
+            if (missingFields.Length == 0)
+                return true;
+
+            return ShowValidationWarning(commandName, $"Please fill in required fields: {string.Join(", ", missingFields)}.");
+        }
+
+        private bool TryGetQueueNameOrWarn(string queueNameFromField, string? currentQueueName, string commandName, out string queueName)
+        {
+            queueName = ResolveQueueName(queueNameFromField, currentQueueName);
+            if (string.IsNullOrWhiteSpace(queueName))
+                return ShowValidationWarning(commandName, "Please specify the queue name in 'Queue Name' or select a current queue.");
+
+            queueName = queueName.Trim();
+            return true;
+        }
+
+        private bool ValidateTicketUpdateInput(string commandName, string duplexing, string outputColor, string orientation)
+        {
+            var hasAnyValue =
+                !string.IsNullOrWhiteSpace(duplexing) ||
+                !string.IsNullOrWhiteSpace(outputColor) ||
+                !string.IsNullOrWhiteSpace(orientation);
+
+            if (hasAnyValue)
+                return true;
+
+            return ShowValidationWarning(commandName, "Please provide at least one ticket field: Duplexing, OutputColor, or Orientation.");
+        }
+
         private async Task ExecuteAsync(string commandName, Func<string> action)
         {
             ClearOutput();
@@ -53,11 +98,14 @@ namespace WppQueuePoc.App
                 StatusTextBlock.Text = $"Error ({commandName})";
             }
         }
-        private string NormalizeOptional(string s) => string.IsNullOrWhiteSpace(s) ? "" : s.Trim();
-        private string ResolveQueueName(string nomeDoCampo, string? nomeAtual)
+
+        private static string NormalizeOptional(string s) => string.IsNullOrWhiteSpace(s) ? "" : s.Trim();
+
+        private static string ResolveQueueName(string nomeDoCampo, string? nomeAtual)
         {
             return !string.IsNullOrWhiteSpace(nomeDoCampo) ? nomeDoCampo.Trim() : (nomeAtual ?? "");
         }
+
         private void SetCurrentQueue(string? queueName)
         {
             _currentQueueName = queueName;
@@ -66,7 +114,7 @@ namespace WppQueuePoc.App
             else
                 CurrentQueueTextBlock.Text = $"Current queue: {queueName}";
         }
-        // ------------ Handlers ------------
+
         private void OnNewQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -83,12 +131,14 @@ namespace WppQueuePoc.App
             SetCurrentQueue(null);
             AppendOutput("Ready to create new print queue.");
         }
+
         private void OnWppStatusClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var status = _wppStatusProvider.GetWppStatus();
             AppendOutput(status.ToString());
         }
+
         private void OnListQueuesClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -99,6 +149,7 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {fila.Name} ({fila.DriverName} @ {fila.PortName})");
             }
         }
+
         private void OnListPortsClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -109,6 +160,7 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {port}");
             }
         }
+
         private void OnListDriversClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -119,6 +171,7 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {driver}");
             }
         }
+
         private void OnListProcessorsClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -129,13 +182,14 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {proc}");
             }
         }
+
         private void OnListDataTypesClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var procName = PrintProcessorTextBox.Text;
             if (string.IsNullOrWhiteSpace(procName))
             {
-                AppendOutput("Please specify the print processor name to see data types.");
+                ShowValidationWarning("list-data-types", "Please specify the print processor name to see data types.");
                 return;
             }
             var tipos = _printSpoolerService.ListDataTypes(procName);
@@ -145,13 +199,14 @@ namespace WppQueuePoc.App
                 AppendOutput($"- {t}");
             }
         }
+
         private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var port = PortNameTextBox.Text;
             if (string.IsNullOrWhiteSpace(port))
             {
-                AppendOutput("Please enter the WSD port name.");
+                ShowValidationWarning("add-wsd-port", "Please enter the WSD port name.");
                 return;
             }
             try
@@ -161,10 +216,11 @@ namespace WppQueuePoc.App
             }
             catch (Exception ex)
             {
-        AppendOutput($"Error adding WSD port:\n{ex.Message}");
+                AppendOutput($"Error adding WSD port:\n{ex.Message}");
                 StatusTextBlock.Text = $"Error (Add WSD Port)";
             }
         }
+
         private void OnCreateQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
@@ -175,57 +231,73 @@ namespace WppQueuePoc.App
             var dataType = DataTypeTextBox.Text;
             var comment = CommentTextBox.Text;
             var location = LocationTextBox.Text;
-            if (string.IsNullOrWhiteSpace(queueName) || string.IsNullOrWhiteSpace(driver) || string.IsNullOrWhiteSpace(port) || string.IsNullOrWhiteSpace(processor) || string.IsNullOrWhiteSpace(dataType))
-            {
-                AppendOutput("Please fill in all required fields: Queue Name, Driver Name, Port Name, Print Processor, Data Type.");
+            if (!ValidateRequiredFields("create-queue",
+                    ("Queue Name", queueName),
+                    ("Driver Name", driver),
+                    ("Port Name", port),
+                    ("Print Processor", processor),
+                    ("Data Type", dataType)))
                 return;
-            }
+
             _printSpoolerService.CreateQueue(queueName, driver, port, processor, dataType, comment, location);
             AppendOutput($"Queue '{queueName}' created.");
             SetCurrentQueue(queueName);
         }
+
         private void OnUpdateQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
-            var queueName = ResolveQueueName(queueNameRaw, currQueue);
             var newQueueName = NormalizeOptional(QueueNameTextBox.Text);
             var newDriverName = NormalizeOptional(DriverNameTextBox.Text);
             var newPortName = NormalizeOptional(PortNameTextBox.Text);
             var comment = NormalizeOptional(CommentTextBox.Text);
             var location = NormalizeOptional(LocationTextBox.Text);
-            if (string.IsNullOrWhiteSpace(queueName))
+            string queueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "update-queue", out queueName))
+                return;
+
+            var hasAnyUpdate =
+                !string.IsNullOrWhiteSpace(newQueueName) ||
+                !string.IsNullOrWhiteSpace(newDriverName) ||
+                !string.IsNullOrWhiteSpace(newPortName) ||
+                !string.IsNullOrWhiteSpace(comment) ||
+                !string.IsNullOrWhiteSpace(location);
+
+            if (!hasAnyUpdate)
             {
-                AppendOutput("Please specify the current queue name to update.");
+                ShowValidationWarning("update-queue", "Please provide at least one field to update: Queue Name, Driver Name, Port Name, Comment, or Location.");
                 return;
             }
+
             _printSpoolerService.UpdateQueue(queueName, newQueueName, newDriverName, newPortName, comment, location);
             AppendOutput($"Queue '{queueName}' updated.");
-            SetCurrentQueue(newQueueName);
+            SetCurrentQueue(string.IsNullOrWhiteSpace(newQueueName) ? queueName : newQueueName);
         }
+
         private void OnDeleteQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
-            if (string.IsNullOrWhiteSpace(_currentQueueName))
-            {
-                AppendOutput("Please specify the current queue name to delete.");
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "delete-queue", out var queueName))
                 return;
-            }
-            var queueName = ResolveQueueName(queueNameRaw, currQueue);
+
             _printSpoolerService.DeleteQueue(queueName);
             AppendOutput($"Queue '{queueName}' deleted.");
             SetCurrentQueue(null);
         }
+
         private async void OnInspectQueueClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "inspect", out var queueName))
+                return;
+
             await ExecuteAsync("inspect", () =>
             {
-                var queueName = ResolveQueueName(queueNameRaw, currQueue);
                 var result = _printSpoolerService.InspectQueue(queueName);
                 var sb = new StringBuilder();
                 sb.AppendLine($"[Inspect] Queue: {queueName}");
@@ -236,28 +308,35 @@ namespace WppQueuePoc.App
                 return sb.ToString();
             });
         }
+
         private async void OnTicketInfoClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-info-default", out var queueName))
+                return;
+
             await ExecuteAsync("ticket-info (default)", () =>
             {
-                var queueName = ResolveQueueName(queueNameRaw, currQueue);
                 var result = _printTicketService.GetDefaultTicketInfo(queueName);
                 return FormatTicketInfoResult(result);
             });
         }
+
         private async void OnTicketUserInfoClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
             var currQueue = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-info-user", out var queueName))
+                return;
+
             await ExecuteAsync("ticket-info (user)", () =>
             {
-                var queueName = ResolveQueueName(queueNameRaw, currQueue);
                 var result = _printTicketService.GetUserTicketInfo(queueName);
                 return FormatTicketInfoResult(result);
             });
         }
+
         private async void OnTicketDefaultUpdateClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
@@ -265,9 +344,14 @@ namespace WppQueuePoc.App
             var ticketDuplexing = TicketDuplexingTextBox.Text;
             var ticketOutputColor = TicketOutputColorTextBox.Text;
             var ticketOrientation = TicketOrientationTextBox.Text;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-update-default", out var queueName))
+                return;
+
+            if (!ValidateTicketUpdateInput("ticket-update-default", ticketDuplexing, ticketOutputColor, ticketOrientation))
+                return;
+
             await ExecuteAsync("ticket-update-default", () =>
             {
-                var queueName = ResolveQueueName(queueNameRaw, currQueue);
                 var request = new PrintTicketUpdateRequest(
                     NormalizeOptional(ticketDuplexing),
                     NormalizeOptional(ticketOutputColor),
@@ -277,20 +361,22 @@ namespace WppQueuePoc.App
                 return FormatTicketUpdateResult(result);
             });
         }
+
         private async void OnTicketUserUpdateClick(object sender, RoutedEventArgs e)
-{
-    var queueNameRaw = QueueNameTextBox.Text;
-    var currQueue = _currentQueueName;
-    var ticketDuplexing = TicketDuplexingTextBox.Text;
-    var ticketOutputColor = TicketOutputColorTextBox.Text;
-    var ticketOrientation = TicketOrientationTextBox.Text;
-    try
-    {
-        await ExecuteAsync("ticket-update-user", () =>
         {
-            try
+            var queueNameRaw = QueueNameTextBox.Text;
+            var currQueue = _currentQueueName;
+            var ticketDuplexing = TicketDuplexingTextBox.Text;
+            var ticketOutputColor = TicketOutputColorTextBox.Text;
+            var ticketOrientation = TicketOrientationTextBox.Text;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-update-user", out var queueName))
+                return;
+
+            if (!ValidateTicketUpdateInput("ticket-update-user", ticketDuplexing, ticketOutputColor, ticketOrientation))
+                return;
+
+            await ExecuteAsync("ticket-update-user", () =>
             {
-                var queueName = ResolveQueueName(queueNameRaw, currQueue);
                 var request = new PrintTicketUpdateRequest(
                     NormalizeOptional(ticketDuplexing),
                     NormalizeOptional(ticketOutputColor),
@@ -298,20 +384,10 @@ namespace WppQueuePoc.App
                 );
                 var result = _printTicketService.UpdateUserTicket(queueName, request);
                 return FormatTicketUpdateResult(result);
-            }
-            catch (Exception ex)
-            {
-                return $"Error while updating user ticket:\n{ex.Message}";
-            }
-        });
-    }
-    catch (Exception ex)
-    {
-        AppendOutput($"Unexpected error in ticket-update-user:\n{ex.Message}");
-    }
-}
-        // Helpers para formatação de saída dos tickets
-        private string FormatTicketInfoResult(PrintTicketInfoResult result)
+            });
+        }
+
+        private static string FormatTicketInfoResult(PrintTicketInfoResult result)
         {
             var sb = new StringBuilder();
             sb.AppendLine("Ticket:");
@@ -323,12 +399,13 @@ namespace WppQueuePoc.App
                     sb.AppendLine($"    {kv.Key}: {kv.Value}");
             return sb.ToString();
         }
+
         private string FormatTicketUpdateResult(PrintTicketUpdateResult result)
         {
             var sb = new StringBuilder();
             if (result.Applied)
             {
-sb.AppendLine("Update completed successfully!");
+                sb.AppendLine("Update completed successfully!");
                 sb.AppendLine(FormatTicketInfoResult(new PrintTicketInfoResult(result.QueueName, result.Applied, result.Details, result.AppliedValues)));
             }
             else
