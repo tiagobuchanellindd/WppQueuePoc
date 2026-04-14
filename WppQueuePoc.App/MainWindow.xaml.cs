@@ -262,7 +262,7 @@ AppendOutput($"Error adding WSD port:\n{ex.Message}");
                 return FormatTicketUpdateResult(result);
             });
         }
-private async void OnTicketUserUpdateClick(object sender, RoutedEventArgs e)
+        private async void OnTicketUserUpdateClick(object sender, RoutedEventArgs e)
 {
     var queueNameRaw = QueueNameTextBox.Text;
     var currQueue = _currentQueueName;

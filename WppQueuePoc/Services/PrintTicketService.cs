@@ -277,7 +277,7 @@ public sealed partial class PrintTicketService : IPrintTicketService
         catch { /* best effort, ignore */ }
     }
     // Reflection utility for ticket writing
-private static bool WriteTicketAttribute(object? ticket, string attrName, string? value)
+    private static bool WriteTicketAttribute(object? ticket, string attrName, string? value)
 {
     try
     {
