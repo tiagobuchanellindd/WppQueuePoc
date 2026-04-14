@@ -142,11 +142,11 @@ namespace WppQueuePoc.App
         private void OnListQueuesClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
-            var filas = _printSpoolerService.ListQueues();
+            var queues = _printSpoolerService.ListQueues();
             AppendOutput("Installed queues:");
-            foreach (var fila in filas)
+            foreach (var queue in queues)
             {
-                AppendOutput($"- {fila.Name} ({fila.DriverName} @ {fila.PortName})");
+                AppendOutput($"- {queue.Name} ({queue.DriverName} @ {queue.PortName})");
             }
         }
 
