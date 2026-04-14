@@ -1,21 +1,61 @@
-# WPP POC Documentation
-
-This directory contains execution and tracking documentation for the proof of concept.
-
-## Contents
-- `objectives-summary.md`: concise summary of delivery goals and initial scope.
-- `business-overview.md`: business explanation of how WPP behavior impacts queues and operations.
-- `architecture-styles.md`: explanation of modern app layer vs native interop layer.
-- `native-methods-guide.md`: deep dive into Winspool P/Invoke methods, structs, and call patterns.
-- `wpp-poc-plan.md`: objectives, approach, and implementation backlog.
-- `phase-status.md`: phase-by-phase status tracking.
-- `poc-operation-guide.md`: execution and usage guide for the application.
-
-## Recommended reading order
-1. `objectives-summary.md` (what this POC delivers)
-2. `business-overview.md` (why this matters and business behavior)
-3. `architecture-styles.md` (how the solution is organized and executed)
-4. `native-methods-guide.md` (how Winspool interop works in this codebase)
-5. `wpp-poc-plan.md` (implementation strategy and scope)
-6. `phase-status.md` (current completion status by phase)
-7. `poc-operation-guide.md` (how to execute commands and validated scenarios)
+# WPP Queue API / POC Documentation
+---
+## EN
+This repository documents a Windows printing API/POC focused on **Windows Protected Print (WPP)** behavior, queue lifecycle management, and native Winspool interoperability.
+### What this project covers
+- Global WPP status detection from Windows Registry.
+- Queue lifecycle operations: create, list, update, delete.
+- Queue inspection heuristics (`LikelyWpp`, `LikelyNotWpp`, `Indeterminate`).
+- Print ticket read/update flows (default and user scope).
+- Native interop patterns (`winspool.drv`, P/Invoke, buffer management, error handling).
+### Documentation structure
+- `docs/guides/`
+  - `docs/guides/01-objectives-summary.md`
+  - `docs/guides/02-business-overview.md`
+  - `docs/guides/03-architecture-styles.md`
+  - `docs/guides/04-native-methods-guide.md`
+- `docs/project/`
+  - `docs/project/01-wpp-poc-plan.md`
+  - `docs/project/02-phase-status.md`
+- `docs/operations/`
+  - `docs/operations/01-poc-operation-guide.md`
+- `docs/estudo/`
+  - In-depth study notes (PT-BR), organized by source file.
+### Recommended reading order
+1. `docs/guides/01-objectives-summary.md` — delivery goals and scope  
+2. `docs/guides/02-business-overview.md` — business context and expected behavior  
+3. `docs/guides/03-architecture-styles.md` — architecture and layer interaction  
+4. `docs/guides/04-native-methods-guide.md` — Winspool interop details  
+5. `docs/project/01-wpp-poc-plan.md` — implementation plan and backlog  
+6. `docs/project/02-phase-status.md` — phase-by-phase completion status  
+7. `docs/operations/01-poc-operation-guide.md` — execution/runbook and validated flows  
+---
+## PT-BR
+Este repositório documenta uma API/POC de impressão no Windows, com foco no comportamento do **Windows Protected Print (WPP)**, no ciclo de vida de filas e na interoperabilidade nativa com Winspool.
+### O que este projeto cobre
+- Detecção do status global de WPP via Registro do Windows.
+- Operações de ciclo de vida de fila: criar, listar, atualizar e excluir.
+- Heurística de inspeção de fila (`LikelyWpp`, `LikelyNotWpp`, `Indeterminate`).
+- Leitura/atualização de print ticket (escopo default e user).
+- Padrões de interop nativo (`winspool.drv`, P/Invoke, buffers, tratamento de erros).
+### Estrutura da documentação
+- `docs/guides/`
+  - `docs/guides/01-objectives-summary.md`
+  - `docs/guides/02-business-overview.md`
+  - `docs/guides/03-architecture-styles.md`
+  - `docs/guides/04-native-methods-guide.md`
+- `docs/project/`
+  - `docs/project/01-wpp-poc-plan.md`
+  - `docs/project/02-phase-status.md`
+- `docs/operations/`
+  - `docs/operations/01-poc-operation-guide.md`
+- `docs/estudo/`
+  - Estudos aprofundados (PT-BR), organizados por arquivo-fonte.
+### Ordem recomendada de leitura
+1. `docs/guides/01-objectives-summary.md` — objetivos de entrega e escopo  
+2. `docs/guides/02-business-overview.md` — contexto de negócio e comportamento esperado  
+3. `docs/guides/03-architecture-styles.md` — arquitetura e interação entre camadas  
+4. `docs/guides/04-native-methods-guide.md` — detalhes de interop com Winspool  
+5. `docs/project/01-wpp-poc-plan.md` — plano de implementação e backlog  
+6. `docs/project/02-phase-status.md` — status por fase  
+7. `docs/operations/01-poc-operation-guide.md` — guia de execução e fluxos validados  
