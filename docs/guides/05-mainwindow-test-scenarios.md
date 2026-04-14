@@ -1,4 +1,4 @@
-# MainWindow Test Scenarios (POC)
+# WppQueuePoc.App Test Scenarios (POC)
 
 This guide provides a compact test checklist based on the actions implemented in `WppQueuePoc.App/MainWindow.xaml.cs`.
 
