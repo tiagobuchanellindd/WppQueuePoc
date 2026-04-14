@@ -14,11 +14,6 @@ This repository documents a Windows printing API/POC focused on **Windows Protec
   - `docs/guides/02-business-overview.md`
   - `docs/guides/03-architecture-styles.md`
   - `docs/guides/04-native-methods-guide.md`
-- `docs/project/`
-  - `docs/project/01-wpp-poc-plan.md`
-  - `docs/project/02-phase-status.md`
-- `docs/operations/`
-  - `docs/operations/01-poc-operation-guide.md`
 - `docs/estudo/`
   - In-depth study notes (PT-BR), organized by source file.
 ### Recommended reading order
@@ -26,9 +21,7 @@ This repository documents a Windows printing API/POC focused on **Windows Protec
 2. `docs/guides/02-business-overview.md` — business context and expected behavior  
 3. `docs/guides/03-architecture-styles.md` — architecture and layer interaction  
 4. `docs/guides/04-native-methods-guide.md` — Winspool interop details  
-5. `docs/project/01-wpp-poc-plan.md` — implementation plan and backlog  
-6. `docs/project/02-phase-status.md` — phase-by-phase completion status  
-7. `docs/operations/01-poc-operation-guide.md` — execution/runbook and validated flows  
+5. `docs/estudo/README.md` — PT-BR study index and deep method-level notes  
 ---
 ## PT-BR
 Este repositório documenta uma API/POC de impressão no Windows, com foco no comportamento do **Windows Protected Print (WPP)**, no ciclo de vida de filas e na interoperabilidade nativa com Winspool.
@@ -44,11 +37,6 @@ Este repositório documenta uma API/POC de impressão no Windows, com foco no co
   - `docs/guides/02-business-overview.md`
   - `docs/guides/03-architecture-styles.md`
   - `docs/guides/04-native-methods-guide.md`
-- `docs/project/`
-  - `docs/project/01-wpp-poc-plan.md`
-  - `docs/project/02-phase-status.md`
-- `docs/operations/`
-  - `docs/operations/01-poc-operation-guide.md`
 - `docs/estudo/`
   - Estudos aprofundados (PT-BR), organizados por arquivo-fonte.
 ### Ordem recomendada de leitura
@@ -56,6 +44,4 @@ Este repositório documenta uma API/POC de impressão no Windows, com foco no co
 2. `docs/guides/02-business-overview.md` — contexto de negócio e comportamento esperado  
 3. `docs/guides/03-architecture-styles.md` — arquitetura e interação entre camadas  
 4. `docs/guides/04-native-methods-guide.md` — detalhes de interop com Winspool  
-5. `docs/project/01-wpp-poc-plan.md` — plano de implementação e backlog  
-6. `docs/project/02-phase-status.md` — status por fase  
-7. `docs/operations/01-poc-operation-guide.md` — guia de execução e fluxos validados  
+5. `docs/estudo/README.md` — índice de estudos e trilhas detalhadas por método  

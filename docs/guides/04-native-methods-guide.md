@@ -33,6 +33,9 @@ It defines how managed C# code calls native Windows Print Spooler APIs (`winspoo
 
 - **`XcvData`**  
   Sends monitor/port administrative commands (for example `AddPort`, `GetAPPortInfo`).
+  Uses two signatures in this project:
+  - `byte[]` input for textual payload commands (for example `AddPort`),
+  - `IntPtr` input/output for structured payload scenarios (for example `GetAPPortInfo`).
 
 - **`AddPrinter` / `SetPrinter` / `DeletePrinter`**  
   Create, update, and delete print queues.
@@ -75,6 +78,8 @@ There are two layers of failure to check:
 
 2. **Operation status from API output (`dwStatus` in `XcvData`)**  
    The function call can succeed while the monitor operation itself is rejected (for example `ERROR_NOT_SUPPORTED`).
+
+This distinction is actively used by `PrintSpoolerService` when creating WSD ports.
 
 ## Safety practices used in the POC
 - Handles are always closed in `finally`.

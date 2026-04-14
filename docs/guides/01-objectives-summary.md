@@ -1,16 +1,23 @@
-# WPP POC Objectives Summary
+# WPP Queue API Objectives Summary
 
-## What we are aiming to deliver
-1. Create print queues in a WPP-compatible Windows environment (for example, Windows 11).
-2. Provide queue lifecycle operations: create, list, update, and delete.
-3. Provide a practical way to evaluate whether a queue is likely operating under WPP.
-4. Expose the global WPP status from Windows Registry (`Enabled`, `Disabled`, or `Unknown`).
+## What this API currently delivers
+1. Queue lifecycle operations in Windows spooler: create, list, update, and delete.
+2. Discovery endpoints for supporting data: ports, drivers, print processors, and datatypes.
+3. WSD port administration via Xcv monitor command (`AddPort`) with status-aware validation.
+4. Global WPP status detection from Windows Registry (`Enabled`, `Disabled`, `Unknown`).
+5. Queue inspection heuristics (`LikelyWpp`, `LikelyNotWpp`, `Indeterminate`) using global status + port/APMON evidence.
+6. Print ticket diagnostics and updates for both scopes:
+   - default queue ticket,
+   - current user ticket.
 
 ## Why this matters
-- WPP is configured at OS level and directly affects print queue behavior.
-- Operations/support teams need a predictable, testable flow to manage queues in WPP scenarios.
-- This POC reduces risk before a production-grade implementation.
+- WPP is a global Windows policy and directly changes expected queue behavior.
+- Printing operations require a reliable operational workflow with clear diagnostics.
+- Native spooler calls are complex; this API centralizes them behind safer service contracts.
 
-## Initial implementation scope
-- WPF interface as the primary operation surface, using the same service contracts of the POC.
-- First technical milestone: `wpp-status` action based on Registry lookup.
+## Current project intent
+- Keep a service/API-first architecture with explicit operation results.
+- Preserve interoperability fidelity with `winspool.drv` while returning actionable messages.
+- Provide study-ready documentation in two tracks:
+  - concise technical guides in `docs/guides/`,
+  - deep method-level notes in `docs/estudo/` (PT-BR).
