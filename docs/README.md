@@ -14,6 +14,7 @@ This repository documents a Windows printing API/POC focused on **Windows Protec
   - `docs/guides/02-business-overview.md`
   - `docs/guides/03-architecture-styles.md`
   - `docs/guides/04-native-methods-guide.md`
+  - `docs/guides/05-mainwindow-test-scenarios.md`
 - `docs/estudo/`
   - In-depth study notes (PT-BR), organized by source file.
 ### Recommended reading order
@@ -21,7 +22,8 @@ This repository documents a Windows printing API/POC focused on **Windows Protec
 2. `docs/guides/02-business-overview.md` — business context and expected behavior  
 3. `docs/guides/03-architecture-styles.md` — architecture and layer interaction  
 4. `docs/guides/04-native-methods-guide.md` — Winspool interop details  
-5. `docs/estudo/README.md` — PT-BR study index and deep method-level notes  
+5. `docs/guides/05-mainwindow-test-scenarios.md` — practical UI test scenarios mapped to implemented actions  
+6. `docs/estudo/README.md` — PT-BR study index and deep method-level notes  
 ---
 ## PT-BR
 Este repositório documenta uma API/POC de impressão no Windows, com foco no comportamento do **Windows Protected Print (WPP)**, no ciclo de vida de filas e na interoperabilidade nativa com Winspool.
@@ -37,6 +39,7 @@ Este repositório documenta uma API/POC de impressão no Windows, com foco no co
   - `docs/guides/02-business-overview.md`
   - `docs/guides/03-architecture-styles.md`
   - `docs/guides/04-native-methods-guide.md`
+  - `docs/guides/05-mainwindow-test-scenarios.md`
 - `docs/estudo/`
   - Estudos aprofundados (PT-BR), organizados por arquivo-fonte.
 ### Ordem recomendada de leitura
@@ -44,4 +47,5 @@ Este repositório documenta uma API/POC de impressão no Windows, com foco no co
 2. `docs/guides/02-business-overview.md` — contexto de negócio e comportamento esperado  
 3. `docs/guides/03-architecture-styles.md` — arquitetura e interação entre camadas  
 4. `docs/guides/04-native-methods-guide.md` — detalhes de interop com Winspool  
-5. `docs/estudo/README.md` — índice de estudos e trilhas detalhadas por método  
+5. `docs/guides/05-mainwindow-test-scenarios.md` — cenários práticos de teste da UI mapeados para as ações implementadas  
+6. `docs/estudo/README.md` — índice de estudos e trilhas detalhadas por método  

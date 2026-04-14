@@ -12,7 +12,7 @@ Beneficios:
 
 - roda em ambientes onde a montagem pode nao estar disponivel;
 - degrada com mensagem descritiva em vez de quebrar fluxo da aplicacao;
-- reduz acoplamento direto com tipos de WPF Printing em tempo de compilacao.
+- reduz acoplamento direto com tipos de impressao de desktop em tempo de compilacao.
 
 ## Capacidades do service
 
