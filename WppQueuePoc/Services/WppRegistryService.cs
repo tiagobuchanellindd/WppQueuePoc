@@ -6,7 +6,12 @@ using WppQueuePoc.Models;
 namespace WppQueuePoc.Services;
 
 /// <summary>
-/// Implementação de status global WPP baseada em Registry de políticas do Windows.
+/// Implementa a consulta do estado global do Windows Protected Print (WPP)
+/// lendo valores de política no Registro do Windows (HKLM).
+///
+/// A classe percorre uma lista de "probes" (caminho + nome de valor), aplica
+/// validações de existência, tipo e mapeamento semântico, e converte o resultado
+/// em um <see cref="WppStatusResult"/> para consumo da aplicação.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class WppRegistryService : IWppStatusProvider
@@ -27,7 +32,20 @@ public sealed class WppRegistryService : IWppStatusProvider
     ];
 
     /// <summary>
-    /// Resolve o estado global WPP a partir das chaves conhecidas de política.
+    /// Resolve o estado final do WPP a partir de chaves de política conhecidas.
+    ///
+    /// A rotina executa uma estratégia de fallback: para cada probe, tenta abrir a
+    /// subchave, ler o valor e convertê-lo para inteiro. Em seguida, compara o
+    /// número lido com os valores esperados de habilitado/desabilitado.
+    ///
+    /// Regras de decisão:
+    /// - Retorna <see cref="WppStatus.Enabled"/> imediatamente ao encontrar um valor
+    ///   mapeado como habilitado.
+    /// - Guarda um candidato <see cref="WppStatus.Disabled"/> e continua procurando,
+    ///   pois um probe posterior ainda pode indicar habilitado.
+    /// - Retorna <see cref="WppStatus.Unknown"/> quando encontra tipo não suportado
+    ///   ou valor fora do mapeamento conhecido.
+    /// - Se nada for encontrado nos probes, assume desabilitado por padrão.
     /// </summary>
     public WppStatusResult GetWppStatus()
     {
@@ -36,6 +54,7 @@ public sealed class WppRegistryService : IWppStatusProvider
         foreach (var probe in Probes)
         {
             using var key = Registry.LocalMachine.OpenSubKey(probe.Path, writable: false);
+
             // Validação de existência: se a chave não existe, tenta o próximo mapeamento conhecido.
             if (key is null)
             {
@@ -49,7 +68,7 @@ public sealed class WppRegistryService : IWppStatusProvider
                 continue;
             }
 
-            // Validação de tipo: só aceitamos tipos que conseguimos converter com segurança.
+            // Validação de tipo: só aceita tipos que conseguimos converter com segurança.
             if (!TryConvertToInt(raw, out var value))
             {
                 return new WppStatusResult(
@@ -102,7 +121,16 @@ public sealed class WppRegistryService : IWppStatusProvider
     }
 
     /// <summary>
-    /// Tenta normalizar o valor lido do Registry para inteiro.
+    /// Tenta normalizar o valor bruto lido do Registro para inteiro.
+    ///
+    /// O método aceita os formatos mais comuns encontrados nesse cenário:
+    /// - <see cref="int"/> (tipo esperado para DWORD no Registry).
+    /// - <see cref="string"/> contendo número válido (fallback para ambientes que
+    ///   persistem o valor em texto).
+    ///
+    /// Retorna <see langword="true"/> quando a conversão é segura, preenchendo
+    /// <paramref name="result"/>; caso contrário, retorna
+    /// <see langword="false"/> e define <paramref name="result"/> com o valor padrão.
     /// </summary>
     private static bool TryConvertToInt(object value, out int result)
     {
