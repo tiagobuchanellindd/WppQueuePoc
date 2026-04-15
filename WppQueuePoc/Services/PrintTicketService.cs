@@ -24,50 +24,50 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// </summary>
     public PrintTicketInfoResult GetDefaultTicketInfo(string queueName)
     {
-        var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var localPrintServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
-        if (localPrintServerType is null)
+        var ticketSettings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var printServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
+        if (printServerType is null)
         {
             return new PrintTicketInfoResult(
                 queueName,
                 Available: false,
                 Details: "System.Printing assembly is not available in this runtime.",
-                Attributes: attributes);
+                Attributes: ticketSettings);
         }
-        object? localPrintServer = null;
-        object? printQueue = null;
+        object? printServer = null;
+        object? queue = null;
         try
         {
-            localPrintServer = CreateLocalPrintServer(localPrintServerType, "AdministrateServer");
-            if (localPrintServer is null)
+            printServer = CreateLocalPrintServer(printServerType, "AdministrateServer");
+            if (printServer is null)
             {
-                return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", attributes);
+                return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", ticketSettings);
             }
-            printQueue = GetPrintQueue(localPrintServerType, localPrintServer, queueName, "DefaultPrintTicket", "AdministratePrinter");
-            if (printQueue is null)
+            queue = GetPrintQueue(printServerType, printServer, queueName, "DefaultPrintTicket", "AdministratePrinter");
+            if (queue is null)
             {
-                return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", attributes);
+                return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", ticketSettings);
             }
-            var queueType = printQueue.GetType();
-            var defaultTicketProperty = queueType.GetProperty("DefaultPrintTicket");
-            var defaultTicket = defaultTicketProperty?.GetValue(printQueue);
+            var queueType = queue.GetType();
+            var defaultTicketPropertyInfo = queueType.GetProperty("DefaultPrintTicket");
+            var defaultTicket = defaultTicketPropertyInfo?.GetValue(queue);
             if (defaultTicket is null)
             {
-                return new PrintTicketInfoResult(queueName, false, "DefaultPrintTicket is not available.", attributes);
+                return new PrintTicketInfoResult(queueName, false, "DefaultPrintTicket is not available.", ticketSettings);
             }
-            ReadTicketAttribute(defaultTicket, "OutputColor", attributes);
-            ReadTicketAttribute(defaultTicket, "PageMediaSize", attributes);
-            ReadTicketAttribute(defaultTicket, "PageOrientation", attributes);
-            ReadTicketAttribute(defaultTicket, "InputBin", attributes);
-            ReadTicketAttribute(defaultTicket, "Duplexing", attributes);
-            ReadTicketAttribute(defaultTicket, "CopyCount", attributes);
-            ReadTicketAttribute(defaultTicket, "Collation", attributes);
-            ReadTicketAttribute(defaultTicket, "Stapling", attributes);
+            ReadTicketAttribute(defaultTicket, "OutputColor", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "PageMediaSize", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "PageOrientation", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "InputBin", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "Duplexing", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "CopyCount", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "Collation", ticketSettings);
+            ReadTicketAttribute(defaultTicket, "Stapling", ticketSettings);
             return new PrintTicketInfoResult(
                 queueName,
                 Available: true,
                 Details: "Default print ticket information captured.",
-                Attributes: attributes);
+                Attributes: ticketSettings);
         }
         catch (Exception ex)
         {
@@ -75,12 +75,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 queueName,
                 Available: false,
                 Details: $"Failed to read default print ticket information: {ex.Message}",
-                Attributes: attributes);
+                Attributes: ticketSettings);
         }
         finally
         {
-            DisposeIfPossible(printQueue);
-            DisposeIfPossible(localPrintServer);
+            DisposeIfPossible(queue);
+            DisposeIfPossible(printServer);
         }
     }
 
@@ -93,50 +93,50 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// </summary>
     public PrintTicketInfoResult GetUserTicketInfo(string queueName)
     {
-        var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var localPrintServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
-        if (localPrintServerType is null)
+        var ticketSettings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var printServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
+        if (printServerType is null)
         {
             return new PrintTicketInfoResult(
                 queueName,
                 Available: false,
                 Details: "System.Printing assembly is not available in this runtime.",
-                Attributes: attributes);
+                Attributes: ticketSettings);
         }
-        object? localPrintServer = null;
-        object? printQueue = null;
+        object? printServer = null;
+        object? queue = null;
         try
         {
-            localPrintServer = CreateLocalPrintServer(localPrintServerType, "AdministrateServer");
-            if (localPrintServer is null)
+            printServer = CreateLocalPrintServer(printServerType, "AdministrateServer");
+            if (printServer is null)
             {
-                return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", attributes);
+                return new PrintTicketInfoResult(queueName, false, "Unable to create LocalPrintServer.", ticketSettings);
             }
-            printQueue = GetPrintQueue(localPrintServerType, localPrintServer, queueName, "UserPrintTicket", "AdministratePrinter");
-            if (printQueue is null)
+            queue = GetPrintQueue(printServerType, printServer, queueName, "UserPrintTicket", "AdministratePrinter");
+            if (queue is null)
             {
-                return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", attributes);
+                return new PrintTicketInfoResult(queueName, false, $"Queue '{queueName}' not found.", ticketSettings);
             }
-            var queueType = printQueue.GetType();
-            var userTicketProperty = queueType.GetProperty("UserPrintTicket");
-            var userTicket = userTicketProperty?.GetValue(printQueue);
+            var queueType = queue.GetType();
+            var userTicketPropertyInfo = queueType.GetProperty("UserPrintTicket");
+            var userTicket = userTicketPropertyInfo?.GetValue(queue);
             if (userTicket is null)
             {
-                return new PrintTicketInfoResult(queueName, false, "UserPrintTicket is not available.", attributes);
+                return new PrintTicketInfoResult(queueName, false, "UserPrintTicket is not available.", ticketSettings);
             }
-            ReadTicketAttribute(userTicket, "OutputColor", attributes);
-            ReadTicketAttribute(userTicket, "PageMediaSize", attributes);
-            ReadTicketAttribute(userTicket, "PageOrientation", attributes);
-            ReadTicketAttribute(userTicket, "InputBin", attributes);
-            ReadTicketAttribute(userTicket, "Duplexing", attributes);
-            ReadTicketAttribute(userTicket, "CopyCount", attributes);
-            ReadTicketAttribute(userTicket, "Collation", attributes);
-            ReadTicketAttribute(userTicket, "Stapling", attributes);
+            ReadTicketAttribute(userTicket, "OutputColor", ticketSettings);
+            ReadTicketAttribute(userTicket, "PageMediaSize", ticketSettings);
+            ReadTicketAttribute(userTicket, "PageOrientation", ticketSettings);
+            ReadTicketAttribute(userTicket, "InputBin", ticketSettings);
+            ReadTicketAttribute(userTicket, "Duplexing", ticketSettings);
+            ReadTicketAttribute(userTicket, "CopyCount", ticketSettings);
+            ReadTicketAttribute(userTicket, "Collation", ticketSettings);
+            ReadTicketAttribute(userTicket, "Stapling", ticketSettings);
             return new PrintTicketInfoResult(
                 queueName,
                 Available: true,
                 Details: "User print ticket information captured.",
-                Attributes: attributes);
+                Attributes: ticketSettings);
         }
         catch (Exception ex)
         {
@@ -144,12 +144,12 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 queueName,
                 Available: false,
                 Details: $"Failed to read user print ticket information: {ex.Message}",
-                Attributes: attributes);
+                Attributes: ticketSettings);
         }
         finally
         {
-            DisposeIfPossible(printQueue);
-            DisposeIfPossible(localPrintServer);
+            DisposeIfPossible(queue);
+            DisposeIfPossible(printServer);
         }
     }
 
@@ -183,126 +183,123 @@ public sealed partial class PrintTicketService : IPrintTicketService
     private PrintTicketUpdateResult UpdatePrintTicketInternal(
     string queueName,
     PrintTicketUpdateRequest request,
-    string ticketTypeProperty,
-    string scope)
+    string ticketPropertyName,
+    string ticketScope)
     {
-        var requested = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        void TryAdd(string key, string? value)
+        var requestedSettings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        void TryAdd(string settingName, string? settingValue)
         {
-            if (!string.IsNullOrWhiteSpace(value))
-                requested[key] = value.Trim();
+            if (!string.IsNullOrWhiteSpace(settingValue))
+                requestedSettings[settingName] = settingValue.Trim();
         }
         TryAdd("Duplexing", request.Duplexing);
         TryAdd("OutputColor", request.OutputColor);
-        var localPrintServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
-        if (localPrintServerType is null)
+        var printServerType = Type.GetType("System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
+        if (printServerType is null)
         {
             return new PrintTicketUpdateResult(
                 queueName,
-                scope,
+                ticketScope,
                 false,
                 "System.Printing not available.",
-                requested,
+                requestedSettings,
                 new Dictionary<string, string>());
         }
-        object? localPrintServer = null;
-        object? printQueue = null;
+        object? printServer = null;
+        object? queue = null;
         try
         {
-            localPrintServer = CreateLocalPrintServer(localPrintServerType, "AdministrateServer");
-            printQueue = GetPrintQueue(localPrintServerType, localPrintServer, queueName, ticketTypeProperty, "AdministratePrinter");
-            if (printQueue is null)
+            printServer = CreateLocalPrintServer(printServerType, "AdministrateServer");
+            queue = GetPrintQueue(printServerType, printServer, queueName, ticketPropertyName, "AdministratePrinter");
+            if (queue is null)
                 return new PrintTicketUpdateResult(
                     queueName,
-                    scope,
+                    ticketScope,
                     false,
                     $"Queue '{queueName}' not found.",
-                    requested,
+                    requestedSettings,
                     new Dictionary<string, string>());
-            var queueType = printQueue.GetType();
-            var ticketProperty = queueType.GetProperty(ticketTypeProperty);
-            if(ticketProperty == null)
+            var queueType = queue.GetType();
+            var ticketPropertyInfo = queueType.GetProperty(ticketPropertyName);
+            if (ticketPropertyInfo == null)
                 return new PrintTicketUpdateResult(
                     queueName,
-                    scope,
+                    ticketScope,
                     false,
-                    $"Print ticket property '{ticketTypeProperty}' not found.",
-                    requested,
+                    $"Print ticket property '{ticketPropertyName}' not found.",
+                    requestedSettings,
                     new Dictionary<string, string>());
-            var ticket = ticketProperty.GetValue(printQueue);
-            if (ticket is null)
+            var targetTicket = ticketPropertyInfo.GetValue(queue);
+            if (targetTicket is null)
                 return new PrintTicketUpdateResult(
                     queueName,
-                    scope,
+                    ticketScope,
                     false,
-                    $"Print ticket '{ticketTypeProperty}' not found (might be unsupported by this driver or printer type).",
-                    requested,
+                    $"Print ticket '{ticketPropertyName}' not found (might be unsupported by this driver or printer type).",
+                    requestedSettings,
                     new Dictionary<string, string>());
             // Aplica os atributos
-            bool changed = false;
-            changed |= WriteTicketAttribute(ticket, "Duplexing", request.Duplexing);
-            changed |= WriteTicketAttribute(ticket, "OutputColor", request.OutputColor);
-            changed |= WriteTicketAttribute(ticket, "PageOrientation", request.PageOrientation); // Now applies PageOrientation updates too!
-            string? commitError = null;
-            if (changed)
+            bool hasChanges = false;
+            hasChanges |= WriteTicketAttribute(targetTicket, "Duplexing", request.Duplexing);
+            hasChanges |= WriteTicketAttribute(targetTicket, "OutputColor", request.OutputColor);
+            hasChanges |= WriteTicketAttribute(targetTicket, "PageOrientation", request.PageOrientation);
+            string? saveErrorDetails = null;
+            if (hasChanges)
             {
                 try
                 {
-                    // Always set the ticket back per MS documentation!
-                    ticketProperty.SetValue(printQueue, ticket);
+                    ticketPropertyInfo.SetValue(queue, targetTicket);
                 }
-                catch(Exception setEx)
+                catch (Exception setTicketException)
                 {
-                    var error = GetInnermostMessage(setEx);
-                    commitError = $"Failed to set updated ticket back on '{ticketTypeProperty}': {error}";
+                    var error = GetInnermostMessage(setTicketException);
+                    saveErrorDetails = $"Failed to set updated ticket back on '{ticketPropertyName}': {error}";
                 }
 
                 try
                 {
-                    // Only commit after set
-                    var commit = queueType.GetMethod("Commit");
-                    commit?.Invoke(printQueue, null);
+                    var commitMethod = queueType.GetMethod("Commit");
+                    commitMethod?.Invoke(queue, null);
                 }
-                catch(Exception commitEx)
+                catch (Exception commitException)
                 {
-                    // Capture possible commit failure
-                    var error = GetInnermostMessage(commitEx);
-                    commitError = $"Commit failed: {error}";
+                    var error = GetInnermostMessage(commitException);
+                    saveErrorDetails = $"Commit failed: {error}";
                 }
             }
             // Lê os valores efetivos após possível commit/aplicação
-            var applied = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            ReadTicketAttribute(ticket, "Duplexing", applied);
-            ReadTicketAttribute(ticket, "OutputColor", applied);
-            ReadTicketAttribute(ticket, "PageOrientation", applied);
+            var appliedSettings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            ReadTicketAttribute(targetTicket, "Duplexing", appliedSettings);
+            ReadTicketAttribute(targetTicket, "OutputColor", appliedSettings);
+            ReadTicketAttribute(targetTicket, "PageOrientation", appliedSettings);
             // Result message
-            string resultMsg = changed
-                ? (commitError == null ? "Ticket updated successfully." : $"Ticket update attempted. {commitError}")
+            string statusMessage = hasChanges
+                ? (saveErrorDetails == null ? "Ticket updated successfully." : $"Ticket update attempted. {saveErrorDetails}")
                 : "No changes needed: the provided values matched current settings.";
 
             return new PrintTicketUpdateResult(
                 queueName,
-                scope,
-                changed,
-                resultMsg,
-                requested,
-                applied);
+                ticketScope,
+                hasChanges,
+                statusMessage,
+                requestedSettings,
+                appliedSettings);
         }
         catch (Exception ex)
         {
             var error = GetInnermostMessage(ex);
             return new PrintTicketUpdateResult(
                 queueName,
-                scope,
+                ticketScope,
                 false,
                 $"Exception during PrintTicket update: {error}. This may occur if the process is not elevated and/or the account does not have 'Manage Printers' permission on this queue.",
-                requested,
+                requestedSettings,
                 new Dictionary<string, string>());
         }
         finally
         {
-            DisposeIfPossible(printQueue);
-            DisposeIfPossible(localPrintServer);
+            DisposeIfPossible(queue);
+            DisposeIfPossible(printServer);
         }
     }
 
@@ -312,17 +309,17 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// A leitura e best-effort: se a propriedade nao existir ou ocorrer excecao,
     /// o metodo ignora a falha para nao interromper a coleta dos demais atributos.
     /// </summary>
-    private static void ReadTicketAttribute(object? ticket, string attrName, IDictionary<string, string> output)
+    private static void ReadTicketAttribute(object? ticket, string propertyName, IDictionary<string, string> settingsOutput)
     {
         try
         {
             if (ticket == null) return;
-            var type = ticket.GetType();
-            var prop = type.GetProperty(attrName);
-            if (prop != null)
+            var ticketType = ticket.GetType();
+            var propertyInfo = ticketType.GetProperty(propertyName);
+            if (propertyInfo != null)
             {
-                var value = prop.GetValue(ticket);
-                output[attrName] = value?.ToString() ?? "";
+                var propertyValue = propertyInfo.GetValue(ticket);
+                settingsOutput[propertyName] = propertyValue?.ToString() ?? "";
             }
         }
         catch { /* best effort, ignore */ }
@@ -335,35 +332,33 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// nullable), compara com o valor atual e retorna <see langword="true"/>
     /// apenas quando uma alteracao efetiva foi aplicada.
     /// </summary>
-    private static bool WriteTicketAttribute(object? ticket, string attrName, string? value)
+    private static bool WriteTicketAttribute(object? ticket, string propertyName, string? requestedValue)
 {
     try
     {
-        if (ticket == null || string.IsNullOrWhiteSpace(value))
+        if (ticket == null || string.IsNullOrWhiteSpace(requestedValue))
             return false;
-        var type = ticket.GetType();
-        var prop = type.GetProperty(attrName);
-        if (prop == null || !prop.CanWrite) return false;
+        var ticketType = ticket.GetType();
+        var propertyInfo = ticketType.GetProperty(propertyName);
+        if (propertyInfo == null || !propertyInfo.CanWrite) return false;
 
-        // Obtain the current value
-        var currentValue = prop.GetValue(ticket);
-        var targetType = prop.PropertyType;
-        object? realValue = ConvertIfPossible(targetType, value);
+        var currentValue = propertyInfo.GetValue(ticket);
+        var propertyType = propertyInfo.PropertyType;
+        object? convertedValue = ConvertIfPossible(propertyType, requestedValue);
 
-        // Compare by string representation for enums/strings, deep equals otherwise
         bool isDifferent;
-        if (currentValue is null && realValue is not null) isDifferent = true;
-        else if (currentValue is not null && realValue is null) isDifferent = true;
-        else if (currentValue is null && realValue is null) isDifferent = false;
-        else if (targetType == typeof(string) || targetType.IsEnum)
-            isDifferent = !string.Equals(currentValue?.ToString()?.Trim(), realValue?.ToString()?.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (currentValue is null && convertedValue is not null) isDifferent = true;
+        else if (currentValue is not null && convertedValue is null) isDifferent = true;
+        else if (currentValue is null && convertedValue is null) isDifferent = false;
+        else if (propertyType == typeof(string) || propertyType.IsEnum)
+            isDifferent = !string.Equals(currentValue?.ToString()?.Trim(), convertedValue?.ToString()?.Trim(), StringComparison.OrdinalIgnoreCase);
         else
-            isDifferent = !Equals(currentValue, realValue);
+            isDifferent = !Equals(currentValue, convertedValue);
 
         if (!isDifferent)
             return false;
 
-        prop.SetValue(ticket, realValue);
+        propertyInfo.SetValue(ticket, convertedValue);
         return true;
     }
     catch { return false; }
@@ -376,30 +371,27 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// falhar e o destino for string, preserva o valor original; caso contrario,
     /// propaga a excecao para o chamador decidir o tratamento.
     /// </summary>
-    private static object? ConvertIfPossible(Type targetType, string value)
+    private static object? ConvertIfPossible(Type targetType, string rawValue)
     {
         try
         {
-            // Handle Nullable<T> for enums and value types
             var isNullable = targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>);
             var underlyingType = isNullable ? Nullable.GetUnderlyingType(targetType) : null;
 
-            if (isNullable && string.IsNullOrWhiteSpace(value))
+            if (isNullable && string.IsNullOrWhiteSpace(rawValue))
                 return null;
             if ((underlyingType ?? targetType).IsEnum)
             {
                 var enumType = (underlyingType ?? targetType);
-                return Enum.Parse(enumType, value, ignoreCase: true);
+                return Enum.Parse(enumType, rawValue, ignoreCase: true);
             }
-            // Handle common value type conversion, including underlying types for nullables
             var realType = underlyingType ?? targetType;
-            return System.Convert.ChangeType(value, realType);
+            return System.Convert.ChangeType(rawValue, realType);
         }
         catch
         {
-            // Only fallback for string destination; otherwise throw
             if (targetType == typeof(string) || (Nullable.GetUnderlyingType(targetType) == typeof(string)))
-                return value;
+                return rawValue;
             throw;
         }
     }
@@ -421,24 +413,24 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// Se o tipo/acesso nao estiver disponivel, faz fallback para construtor
     /// padrao para maximizar compatibilidade entre ambientes.
     /// </summary>
-    private static object? CreateLocalPrintServer(Type localPrintServerType, string desiredAccessName)
+    private static object? CreateLocalPrintServer(Type printServerType, string requestedAccessName)
     {
         try
         {
             var desiredAccessType = Type.GetType("System.Printing.PrintSystemDesiredAccess, System.Printing", throwOnError: false);
             if (desiredAccessType is null)
-                return Activator.CreateInstance(localPrintServerType);
+                return Activator.CreateInstance(printServerType);
 
-            var desiredAccess = Enum.Parse(desiredAccessType, desiredAccessName, ignoreCase: true);
-            var ctor = localPrintServerType.GetConstructor(new[] { desiredAccessType });
+            var desiredAccess = Enum.Parse(desiredAccessType, requestedAccessName, ignoreCase: true);
+            var ctor = printServerType.GetConstructor(new[] { desiredAccessType });
             if (ctor is null)
-                return Activator.CreateInstance(localPrintServerType);
+                return Activator.CreateInstance(printServerType);
 
             return ctor.Invoke(new[] { desiredAccess });
         }
         catch
         {
-            return Activator.CreateInstance(localPrintServerType);
+            return Activator.CreateInstance(printServerType);
         }
     }
 
@@ -450,39 +442,39 @@ public sealed partial class PrintTicketService : IPrintTicketService
     /// propriedades e, por fim, a sobrecarga simples por nome.
     /// </summary>
     private static object? GetPrintQueue(
-        Type localPrintServerType,
-        object? localPrintServer,
+        Type printServerType,
+        object? printServer,
         string queueName,
-        string ticketProperty,
-        string desiredAccessName)
+        string requiredTicketPropertyName,
+        string requestedAccessName)
     {
-        if (localPrintServer is null)
+        if (printServer is null)
             return null;
 
         var desiredAccessType = Type.GetType("System.Printing.PrintSystemDesiredAccess, System.Printing", throwOnError: false);
         if (desiredAccessType is not null)
         {
-            var desiredAccess = Enum.Parse(desiredAccessType, desiredAccessName, ignoreCase: true);
+            var desiredAccess = Enum.Parse(desiredAccessType, requestedAccessName, ignoreCase: true);
 
             var printQueueType = Type.GetType("System.Printing.PrintQueue, System.Printing", throwOnError: false);
-            var printServerType = Type.GetType("System.Printing.PrintServer, System.Printing", throwOnError: false);
-            if (printQueueType is not null && printServerType is not null && printServerType.IsInstanceOfType(localPrintServer))
+            var basePrintServerType = Type.GetType("System.Printing.PrintServer, System.Printing", throwOnError: false);
+            if (printQueueType is not null && basePrintServerType is not null && basePrintServerType.IsInstanceOfType(printServer))
             {
-                var ctor = printQueueType.GetConstructor(new[] { printServerType, typeof(string), desiredAccessType });
+                var ctor = printQueueType.GetConstructor(new[] { basePrintServerType, typeof(string), desiredAccessType });
                 if (ctor is not null)
-                    return ctor.Invoke(new object[] { localPrintServer, queueName, desiredAccess });
+                    return ctor.Invoke(new object[] { printServer, queueName, desiredAccess });
             }
         }
 
-        var getQueueWithProperties = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string), typeof(string[]) });
+        var getQueueWithProperties = printServerType.GetMethod("GetPrintQueue", new[] { typeof(string), typeof(string[]) });
         if (getQueueWithProperties is not null)
         {
-            var properties = new[] { ticketProperty };
-            return getQueueWithProperties.Invoke(localPrintServer, new object[] { queueName, properties });
+            var properties = new[] { requiredTicketPropertyName };
+            return getQueueWithProperties.Invoke(printServer, new object[] { queueName, properties });
         }
 
-        var getQueueDefault = localPrintServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
-        return getQueueDefault?.Invoke(localPrintServer, new object[] { queueName });
+        var getQueueDefault = printServerType.GetMethod("GetPrintQueue", new[] { typeof(string) });
+        return getQueueDefault?.Invoke(printServer, new object[] { queueName });
     }
 
     /// <summary>

@@ -43,7 +43,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
             return;
         }
 
-        var defaults = new NativeMethods.PRINTER_DEFAULTS
+        var printerDefaults = new NativeMethods.PRINTER_DEFAULTS
         {
             pDatatype = null,
             pDevMode = IntPtr.Zero,
@@ -51,47 +51,47 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         };
 
         // Validação de acesso nativo: sem handle Xcv não há como enviar AddPort.
-        if (!NativeMethods.OpenPrinter(",XcvMonitor WSD Port", out var hXcv, ref defaults))
+        if (!NativeMethods.OpenPrinter(",XcvMonitor WSD Port", out var xcvHandle, ref printerDefaults))
         {
             ThrowLastWin32("OpenPrinter for XcvMonitor WSD Port failed.");
         }
 
         try
         {
-            var payload = Encoding.Unicode.GetBytes(portName + '\0');
+            var addPortPayload = Encoding.Unicode.GetBytes(portName + '\0');
             // Validação da chamada nativa: erro aqui indica falha do canal XcvData.
             if (!NativeMethods.XcvData(
-                    hXcv,
+                    xcvHandle,
                     "AddPort",
-                    payload,
-                    payload.Length,
+                    addPortPayload,
+                    addPortPayload.Length,
                     IntPtr.Zero,
                     0,
                     out _,
-                    out var status))
+                    out var xcvCommandStatus))
             {
                 ThrowLastWin32("XcvData(AddPort) call failed.");
             }
 
             // Validação de status de operação: mesmo com chamada bem-sucedida, o monitor pode rejeitar.
-            if (status != NativeMethods.ERROR_SUCCESS)
+            if (xcvCommandStatus != NativeMethods.ERROR_SUCCESS)
             {
                 // Validação de cenário conhecido: ambiente sem suporte direto ao AddPort.
-                if (status == NativeMethods.ERROR_NOT_SUPPORTED)
+                if (xcvCommandStatus == NativeMethods.ERROR_NOT_SUPPORTED)
                 {
                     throw new Win32Exception(
-                        (int)status,
+                        (int)xcvCommandStatus,
                         "XcvData(AddPort) returned ERROR_NOT_SUPPORTED for WSD monitor. This environment likely requires device-discovery flow for WSD port creation. Use 'list-ports' and reuse an existing WSD port.");
                 }
 
-                throw new Win32Exception((int)status, $"XcvData(AddPort) returned status {status}.");
+                throw new Win32Exception((int)xcvCommandStatus, $"XcvData(AddPort) returned status {xcvCommandStatus}.");
             }
 
-            Console.WriteLine($"XcvData(AddPort) dwStatus={status}.");
+            Console.WriteLine($"XcvData(AddPort) dwStatus={xcvCommandStatus}.");
         }
         finally
         {
-            NativeMethods.ClosePrinter(hXcv);
+            NativeMethods.ClosePrinter(xcvHandle);
         }
     }
 
@@ -114,7 +114,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         string comment,
         string location)
     {
-        var info = new NativeMethods.PRINTER_INFO_2
+        var printerInfo = new NativeMethods.PRINTER_INFO_2
         {
             pServerName = null,
             pPrinterName = queueName,
@@ -139,26 +139,27 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
             AveragePPM = 0
         };
 
-        var infoPtr = IntPtr.Zero;
+        var printerInfoPtr = IntPtr.Zero;
         try
         {
-            infoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<NativeMethods.PRINTER_INFO_2>());
-            Marshal.StructureToPtr(info, infoPtr, false);
-            var handle = NativeMethods.AddPrinter(null, 2, infoPtr);
+            printerInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<NativeMethods.PRINTER_INFO_2>());
+            Marshal.StructureToPtr(printerInfo, printerInfoPtr, false);
+            var printerHandle = NativeMethods.AddPrinter(null, 2, printerInfoPtr);
+
             // Validação de criação: handle nulo significa que o spooler recusou a nova fila.
-            if (handle == IntPtr.Zero)
+            if (printerHandle == IntPtr.Zero)
             {
                 ThrowLastWin32("AddPrinter failed.");
             }
 
-            NativeMethods.ClosePrinter(handle);
+            NativeMethods.ClosePrinter(printerHandle);
         }
         finally
         {
-            if (infoPtr != IntPtr.Zero)
+            if (printerInfoPtr != IntPtr.Zero)
             {
-                Marshal.DestroyStructure<NativeMethods.PRINTER_INFO_2>(infoPtr);
-                Marshal.FreeHGlobal(infoPtr);
+                Marshal.DestroyStructure<NativeMethods.PRINTER_INFO_2>(printerInfoPtr);
+                Marshal.FreeHGlobal(printerInfoPtr);
             }
         }
     }
@@ -200,7 +201,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                 1,
                 IntPtr.Zero,
                 0,
-                out var needed,
+                out var requiredBufferSize,
                 out _))
         {
             var error = Marshal.GetLastWin32Error();
@@ -212,36 +213,36 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
 
         // Validação de conteúdo: sem bytes necessários, não há portas para retornar.
-        if (needed == 0)
+        if (requiredBufferSize == 0)
         {
             return [];
         }
 
-        var buffer = Marshal.AllocHGlobal((int)needed);
+        var portsBuffer = Marshal.AllocHGlobal((int)requiredBufferSize);
         try
         {
             // Validação da leitura efetiva: segunda chamada precisa preencher o buffer.
             if (!NativeMethods.EnumPorts(
                     null,
                     1,
-                    buffer,
-                    needed,
+                    portsBuffer,
+                    requiredBufferSize,
                     out _,
-                    out var returned))
+                    out var returnedPortCount))
             {
                 ThrowLastWin32("EnumPorts failed.");
             }
 
-            var structSize = Marshal.SizeOf<NativeMethods.PORT_INFO_1>();
-            var ports = new List<string>((int)returned);
-            for (var i = 0; i < returned; i++)
+            var portInfoStructSize = Marshal.SizeOf<NativeMethods.PORT_INFO_1>();
+            var ports = new List<string>((int)returnedPortCount);
+            for (var index = 0; index < returnedPortCount; index++)
             {
-                var ptr = IntPtr.Add(buffer, i * structSize);
-                var info = Marshal.PtrToStructure<NativeMethods.PORT_INFO_1>(ptr);
-                // Validação de dado: ignora nomes nulos/vazios para não poluir saída.
-                if (!string.IsNullOrWhiteSpace(info.pName))
+                var currentPortInfoPtr = IntPtr.Add(portsBuffer, index * portInfoStructSize);
+                var portInfo = Marshal.PtrToStructure<NativeMethods.PORT_INFO_1>(currentPortInfoPtr);
+
+                if (!string.IsNullOrWhiteSpace(portInfo.pName))
                 {
-                    ports.Add(info.pName);
+                    ports.Add(portInfo.pName);
                 }
             }
 
@@ -250,7 +251,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(portsBuffer);
         }
     }
 
@@ -270,7 +271,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                 2,
                 IntPtr.Zero,
                 0,
-                out var needed,
+                out var requiredBufferSize,
                 out _))
         {
             var error = Marshal.GetLastWin32Error();
@@ -282,12 +283,12 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
 
         // Validação de conteúdo: host sem drivers retornáveis.
-        if (needed == 0)
+        if (requiredBufferSize == 0)
         {
             return [];
         }
 
-        var buffer = Marshal.AllocHGlobal((int)needed);
+        var driversBuffer = Marshal.AllocHGlobal((int)requiredBufferSize);
         try
         {
             // Validação da leitura efetiva no buffer alocado.
@@ -295,24 +296,24 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                     null,
                     null,
                     2,
-                    buffer,
-                    needed,
+                    driversBuffer,
+                    requiredBufferSize,
                     out _,
-                    out var returned))
+                    out var returnedDriverCount))
             {
                 ThrowLastWin32("EnumPrinterDrivers failed.");
             }
 
-            var structSize = Marshal.SizeOf<NativeMethods.DRIVER_INFO_2>();
-            var drivers = new List<string>((int)returned);
-            for (var i = 0; i < returned; i++)
+            var driverInfoStructSize = Marshal.SizeOf<NativeMethods.DRIVER_INFO_2>();
+            var drivers = new List<string>((int)returnedDriverCount);
+            for (var index = 0; index < returnedDriverCount; index++)
             {
-                var ptr = IntPtr.Add(buffer, i * structSize);
-                var info = Marshal.PtrToStructure<NativeMethods.DRIVER_INFO_2>(ptr);
-                // Validação de dado: adiciona apenas nomes válidos.
-                if (!string.IsNullOrWhiteSpace(info.pName))
+                var currentDriverInfoPtr = IntPtr.Add(driversBuffer, index * driverInfoStructSize);
+                var driverInfo = Marshal.PtrToStructure<NativeMethods.DRIVER_INFO_2>(currentDriverInfoPtr);
+
+                if (!string.IsNullOrWhiteSpace(driverInfo.pName))
                 {
-                    drivers.Add(info.pName);
+                    drivers.Add(driverInfo.pName);
                 }
             }
 
@@ -321,7 +322,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(driversBuffer);
         }
     }
 
@@ -341,7 +342,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                 1,
                 IntPtr.Zero,
                 0,
-                out var needed,
+                out var requiredBufferSize,
                 out _))
         {
             var error = Marshal.GetLastWin32Error();
@@ -353,12 +354,12 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
 
         // Validação de conteúdo: nenhum processador retornado.
-        if (needed == 0)
+        if (requiredBufferSize == 0)
         {
             return [];
         }
 
-        var buffer = Marshal.AllocHGlobal((int)needed);
+        var processorsBuffer = Marshal.AllocHGlobal((int)requiredBufferSize);
         try
         {
             // Validação da leitura efetiva no buffer alocado.
@@ -366,10 +367,10 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                     null,
                     null,
                     1,
-                    buffer,
-                    needed,
+                    processorsBuffer,
+                    requiredBufferSize,
                     out _,
-                    out var returned))
+                    out var returnedProcessorCount))
             {
                 ThrowLastWin32("EnumPrintProcessors failed.");
             }
@@ -377,16 +378,16 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
             // O buffer já foi preenchido pelo EnumPrintProcessors com um "array" nativo de structs.
             // Aqui calculamos o tamanho de cada item para navegar posição a posição no bloco de memória.
             // Em cada posição, convertemos os bytes para PRINTPROCESSOR_INFO_1 e extraímos o nome.
-            var structSize = Marshal.SizeOf<NativeMethods.PRINTPROCESSOR_INFO_1>();
-            var processors = new List<string>((int)returned);
-            for (var i = 0; i < returned; i++)
+            var processorInfoStructSize = Marshal.SizeOf<NativeMethods.PRINTPROCESSOR_INFO_1>();
+            var processors = new List<string>((int)returnedProcessorCount);
+            for (var index = 0; index < returnedProcessorCount; index++)
             {
-                var ptr = IntPtr.Add(buffer, i * structSize);
-                var info = Marshal.PtrToStructure<NativeMethods.PRINTPROCESSOR_INFO_1>(ptr);
-                // Validação de dado: ignora entradas sem nome.
-                if (!string.IsNullOrWhiteSpace(info.pName))
+                var currentProcessorInfoPtr = IntPtr.Add(processorsBuffer, index * processorInfoStructSize);
+                var processorInfo = Marshal.PtrToStructure<NativeMethods.PRINTPROCESSOR_INFO_1>(currentProcessorInfoPtr);
+
+                if (!string.IsNullOrWhiteSpace(processorInfo.pName))
                 {
-                    processors.Add(info.pName);
+                    processors.Add(processorInfo.pName);
                 }
             }
 
@@ -395,7 +396,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(processorsBuffer);
         }
     }
 
@@ -424,7 +425,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                 1,
                 IntPtr.Zero,
                 0,
-                out var needed,
+                out var requiredBufferSize,
                 out _))
         {
             var error = Marshal.GetLastWin32Error();
@@ -436,12 +437,12 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
 
         // Validação de conteúdo: processador sem datatypes retornáveis.
-        if (needed == 0)
+        if (requiredBufferSize == 0)
         {
             return [];
         }
 
-        var buffer = Marshal.AllocHGlobal((int)needed);
+        var dataTypesBuffer = Marshal.AllocHGlobal((int)requiredBufferSize);
         try
         {
             // Validação da leitura efetiva no buffer alocado.
@@ -449,24 +450,24 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                     null,
                     printProcessor,
                     1,
-                    buffer,
-                    needed,
+                    dataTypesBuffer,
+                    requiredBufferSize,
                     out _,
-                    out var returned))
+                    out var returnedDataTypeCount))
             {
                 ThrowLastWin32($"EnumPrintProcessorDatatypes failed for '{printProcessor}'.");
             }
 
-            var structSize = Marshal.SizeOf<NativeMethods.DATATYPES_INFO_1>();
-            var dataTypes = new List<string>((int)returned);
-            for (var i = 0; i < returned; i++)
+            var dataTypeInfoStructSize = Marshal.SizeOf<NativeMethods.DATATYPES_INFO_1>();
+            var dataTypes = new List<string>((int)returnedDataTypeCount);
+            for (var index = 0; index < returnedDataTypeCount; index++)
             {
-                var ptr = IntPtr.Add(buffer, i * structSize);
-                var info = Marshal.PtrToStructure<NativeMethods.DATATYPES_INFO_1>(ptr);
-                // Validação de dado: adiciona apenas nomes de datatype válidos.
-                if (!string.IsNullOrWhiteSpace(info.pName))
+                var currentDataTypeInfoPtr = IntPtr.Add(dataTypesBuffer, index * dataTypeInfoStructSize);
+                var dataTypeInfo = Marshal.PtrToStructure<NativeMethods.DATATYPES_INFO_1>(currentDataTypeInfoPtr);
+
+                if (!string.IsNullOrWhiteSpace(dataTypeInfo.pName))
                 {
-                    dataTypes.Add(info.pName);
+                    dataTypes.Add(dataTypeInfo.pName);
                 }
             }
 
@@ -475,7 +476,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(dataTypesBuffer);
         }
     }
 
@@ -491,38 +492,38 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     /// </summary>
     public void UpdateQueue(string queueName, string? newQueueName, string? newDriverName, string? newPortName, string? comment, string? location)
     {
-        var info = GetQueueInfo(queueName);
-        info.pDevMode = IntPtr.Zero;
-        info.pSecurityDescriptor = IntPtr.Zero;
+        var queueInfo = GetQueueInfo(queueName);
+        queueInfo.pDevMode = IntPtr.Zero;
+        queueInfo.pSecurityDescriptor = IntPtr.Zero;
         var hasChanges = false;
 
         if (newQueueName is not null)
         {
-            info.pPrinterName = newQueueName;
+            queueInfo.pPrinterName = newQueueName;
             hasChanges = true;
         }
 
         if (newDriverName is not null)
         {
-            info.pDriverName = newDriverName;
+            queueInfo.pDriverName = newDriverName;
             hasChanges = true;
         }
 
         if (newPortName is not null)
         {
-            info.pPortName = newPortName;
+            queueInfo.pPortName = newPortName;
             hasChanges = true;
         }
 
         if (comment is not null)
         {
-            info.pComment = comment;
+            queueInfo.pComment = comment;
             hasChanges = true;
         }
 
         if (location is not null)
         {
-            info.pLocation = location;
+            queueInfo.pLocation = location;
             hasChanges = true;
         }
 
@@ -532,7 +533,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
             throw new InvalidOperationException("Provide at least one update field.");
         }
 
-        var defaults = new NativeMethods.PRINTER_DEFAULTS
+        var printerDefaults = new NativeMethods.PRINTER_DEFAULTS
         {
             pDatatype = null,
             pDevMode = IntPtr.Zero,
@@ -540,36 +541,36 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         };
 
         // Validação de acesso administrativo: necessário para SetPrinter.
-        if (!NativeMethods.OpenPrinter(queueName, out var handle, ref defaults))
+        if (!NativeMethods.OpenPrinter(queueName, out var printerHandle, ref printerDefaults))
         {
             ThrowLastWin32($"OpenPrinter failed for queue '{queueName}'.");
         }
 
         try
         {
-            var infoPtr = IntPtr.Zero;
+            var printerInfoPtr = IntPtr.Zero;
             try
             {
-                infoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<NativeMethods.PRINTER_INFO_2>());
-                Marshal.StructureToPtr(info, infoPtr, false);
+                printerInfoPtr = Marshal.AllocHGlobal(Marshal.SizeOf<NativeMethods.PRINTER_INFO_2>());
+                Marshal.StructureToPtr(queueInfo, printerInfoPtr, false);
                 // Validação de persistência: garante que a alteração foi aplicada no spooler.
-                if (!NativeMethods.SetPrinter(handle, 2, infoPtr, 0))
+                if (!NativeMethods.SetPrinter(printerHandle, 2, printerInfoPtr, 0))
                 {
                     ThrowLastWin32($"SetPrinter failed for queue '{queueName}'.");
                 }
             }
             finally
             {
-                if (infoPtr != IntPtr.Zero)
+                if (printerInfoPtr != IntPtr.Zero)
                 {
-                    Marshal.DestroyStructure<NativeMethods.PRINTER_INFO_2>(infoPtr);
-                    Marshal.FreeHGlobal(infoPtr);
+                    Marshal.DestroyStructure<NativeMethods.PRINTER_INFO_2>(printerInfoPtr);
+                    Marshal.FreeHGlobal(printerInfoPtr);
                 }
             }
         }
         finally
         {
-            NativeMethods.ClosePrinter(handle);
+            NativeMethods.ClosePrinter(printerHandle);
         }
     }
 
@@ -583,7 +584,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     /// </summary>
     public void DeleteQueue(string queueName)
     {
-        var defaults = new NativeMethods.PRINTER_DEFAULTS
+        var printerDefaults = new NativeMethods.PRINTER_DEFAULTS
         {
             pDatatype = null,
             pDevMode = IntPtr.Zero,
@@ -591,7 +592,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         };
 
         // Validação de acesso total: exclusão exige permissões elevadas no handle.
-        if (!NativeMethods.OpenPrinter(queueName, out var handle, ref defaults))
+        if (!NativeMethods.OpenPrinter(queueName, out var printerHandle, ref printerDefaults))
         {
             ThrowLastWin32($"OpenPrinter failed for queue '{queueName}'.");
         }
@@ -599,7 +600,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         try
         {
             // Validação de exclusão: sem sucesso, converte erro nativo para mensagem operável.
-            if (!NativeMethods.DeletePrinter(handle))
+            if (!NativeMethods.DeletePrinter(printerHandle))
             {
                 var error = Marshal.GetLastWin32Error();
                 // Validação de erro comum: feedback explícito para o caso de acesso negado.
@@ -615,7 +616,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
         finally
         {
-            NativeMethods.ClosePrinter(handle);
+            NativeMethods.ClosePrinter(printerHandle);
         }
     }
 
@@ -632,54 +633,54 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     /// </summary>
     public QueueInspectionResult InspectQueue(string queueName)
     {
-        var queue = GetQueueInfo(queueName);
-        var port = queue.pPortName ?? string.Empty;
-        var isWsdPort = port.StartsWith("WSD", StringComparison.OrdinalIgnoreCase);
-        var global = wppStatusProvider.GetWppStatus().Status;
+        var queueInfo = GetQueueInfo(queueName);
+        var portName = queueInfo.pPortName ?? string.Empty;
+        var isWsdPort = portName.StartsWith("WSD", StringComparison.OrdinalIgnoreCase);
+        var globalWppStatus = wppStatusProvider.GetWppStatus().Status;
 
-        var detailsParts = new List<string>();
-        var apPort = TryGetApPortInfo(port);
+        var diagnosticDetails = new List<string>();
+        var apPortInfo = TryGetApPortInfo(portName);
         // Validação de evidência opcional: APMON enriquece a classificação quando disponível.
-        if (apPort is not null)
+        if (apPortInfo is not null)
         {
-            detailsParts.Add($"APMON Protocol={ProtocolToString(apPort.Protocol)}({apPort.Protocol})");
+            diagnosticDetails.Add($"APMON Protocol={ProtocolToString(apPortInfo.Protocol)}({apPortInfo.Protocol})");
             // Validação de detalhe adicional: URL pode existir para reforçar rastreabilidade.
-            if (!string.IsNullOrWhiteSpace(apPort.DeviceOrServiceUrl))
+            if (!string.IsNullOrWhiteSpace(apPortInfo.DeviceOrServiceUrl))
             {
-                detailsParts.Add($"APMON Url={apPort.DeviceOrServiceUrl}");
+                diagnosticDetails.Add($"APMON Url={apPortInfo.DeviceOrServiceUrl}");
             }
         }
 
         // Regra da POC: status global + evidências de porta/protocolo determinam a classificação.
         var classification = WppQueueClassification.Indeterminate;
         // Validação principal: WPP global habilitado + sinais modernos -> provável WPP.
-        if (global == WppStatus.Enabled && (isWsdPort || (apPort?.Protocol is 1 or 2)))
+        if (globalWppStatus == WppStatus.Enabled && (isWsdPort || (apPortInfo?.Protocol is 1 or 2)))
         {
             classification = WppQueueClassification.LikelyWpp;
-            detailsParts.Insert(0, "Global WPP is enabled and queue indicates modern monitored port.");
+            diagnosticDetails.Insert(0, "Global WPP is enabled and queue indicates modern monitored port.");
         }
         // Validação principal: WPP global desabilitado prevalece como provável não-WPP.
-        else if (global == WppStatus.Disabled)
+        else if (globalWppStatus == WppStatus.Disabled)
         {
             classification = WppQueueClassification.LikelyNotWpp;
-            detailsParts.Insert(0, "Global WPP is disabled.");
+            diagnosticDetails.Insert(0, "Global WPP is disabled.");
         }
         // Validação de inconsistência: global ativo sem sinal de porta moderna.
-        else if (global == WppStatus.Enabled && !isWsdPort)
+        else if (globalWppStatus == WppStatus.Enabled && !isWsdPort)
         {
-            detailsParts.Insert(0, "Global WPP is enabled but queue port does not look like WSD.");
+            diagnosticDetails.Insert(0, "Global WPP is enabled but queue port does not look like WSD.");
         }
         else
         {
-            detailsParts.Insert(0, "Queue classification needs more evidence.");
+            diagnosticDetails.Insert(0, "Queue classification needs more evidence.");
         }
 
         return new QueueInspectionResult(
-            queue.pPrinterName ?? queueName,
-            port,
-            global,
+            queueInfo.pPrinterName ?? queueName,
+            portName,
+            globalWppStatus,
             classification,
-            string.Join(" | ", detailsParts));
+            string.Join(" | ", diagnosticDetails));
     }
 
     /// <summary>
@@ -714,57 +715,57 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
             return null;
         }
 
-        var defaults = new NativeMethods.PRINTER_DEFAULTS
+        var printerDefaults = new NativeMethods.PRINTER_DEFAULTS
         {
             pDatatype = null,
             pDevMode = IntPtr.Zero,
             DesiredAccess = NativeMethods.SERVER_ACCESS_ADMINISTER
         };
 
-        var xcvName = $",XcvPort {portName}";
+        var xcvPortName = $",XcvPort {portName}";
         // Validação de acesso: se XcvPort não abre, a inspeção segue sem APMON.
-        if (!NativeMethods.OpenPrinter(xcvName, out var hXcv, ref defaults))
+        if (!NativeMethods.OpenPrinter(xcvPortName, out var xcvHandle, ref printerDefaults))
         {
             return null;
         }
 
         try
         {
-            var dataSize = Marshal.SizeOf<NativeMethods.AP_PORT_DATA_1>();
-            var pData = Marshal.AllocHGlobal(dataSize);
+            var apPortDataSize = Marshal.SizeOf<NativeMethods.AP_PORT_DATA_1>();
+            var apPortDataPtr = Marshal.AllocHGlobal(apPortDataSize);
             try
             {
                 // Validação da chamada: falhas em GetAPPortInfo não devem quebrar inspeção.
                 if (!NativeMethods.XcvData(
-                        hXcv,
+                        xcvHandle,
                         "GetAPPortInfo",
                         IntPtr.Zero,
                         0,
-                        pData,
-                        (uint)dataSize,
+                        apPortDataPtr,
+                        (uint)apPortDataSize,
                         out _,
-                        out var xcvStatus))
+                        out var xcvCommandStatus))
                 {
                     return null;
                 }
 
                 // Validação de status de comando: só usa evidência quando o monitor confirma sucesso.
-                if (xcvStatus != NativeMethods.ERROR_SUCCESS)
+                if (xcvCommandStatus != NativeMethods.ERROR_SUCCESS)
                 {
                     return null;
                 }
 
-                var nativeData = Marshal.PtrToStructure<NativeMethods.AP_PORT_DATA_1>(pData);
-                return new ApPortData(nativeData.Version, nativeData.Protocol, nativeData.DeviceOrServiceUrl ?? string.Empty);
+                var apPortData = Marshal.PtrToStructure<NativeMethods.AP_PORT_DATA_1>(apPortDataPtr);
+                return new ApPortData(apPortData.Version, apPortData.Protocol, apPortData.DeviceOrServiceUrl ?? string.Empty);
             }
             finally
             {
-                Marshal.FreeHGlobal(pData);
+                Marshal.FreeHGlobal(apPortDataPtr);
             }
         }
         finally
         {
-            NativeMethods.ClosePrinter(hXcv);
+            NativeMethods.ClosePrinter(xcvHandle);
         }
     }
 
@@ -777,7 +778,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
     /// </summary>
     private static NativeMethods.PRINTER_INFO_2 GetQueueInfo(string queueName)
     {
-        var defaults = new NativeMethods.PRINTER_DEFAULTS
+        var printerDefaults = new NativeMethods.PRINTER_DEFAULTS
         {
             pDatatype = null,
             pDevMode = IntPtr.Zero,
@@ -785,7 +786,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         };
 
         // Validação de existência/acesso: sem abrir a fila, não há inspeção/atualização confiável.
-        if (!NativeMethods.OpenPrinter(queueName, out var handle, ref defaults))
+        if (!NativeMethods.OpenPrinter(queueName, out var printerHandle, ref printerDefaults))
         {
             ThrowLastWin32($"OpenPrinter failed for queue '{queueName}'.");
         }
@@ -793,7 +794,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         try
         {
             // Validação de tamanho de buffer para leitura de PRINTER_INFO_2.
-            if (!NativeMethods.GetPrinter(handle, 2, IntPtr.Zero, 0, out var needed))
+            if (!NativeMethods.GetPrinter(printerHandle, 2, IntPtr.Zero, 0, out var requiredBufferSize))
             {
                 var error = Marshal.GetLastWin32Error();
                 // Validação de erro esperado: fora INSUFFICIENT_BUFFER é falha real.
@@ -803,25 +804,25 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                 }
             }
 
-            var buffer = Marshal.AllocHGlobal((int)needed);
+            var printerInfoBuffer = Marshal.AllocHGlobal((int)requiredBufferSize);
             try
             {
                 // Validação da leitura efetiva dos metadados da fila.
-                if (!NativeMethods.GetPrinter(handle, 2, buffer, needed, out _))
+                if (!NativeMethods.GetPrinter(printerHandle, 2, printerInfoBuffer, requiredBufferSize, out _))
                 {
                     ThrowLastWin32($"GetPrinter failed for queue '{queueName}'.");
                 }
 
-                return Marshal.PtrToStructure<NativeMethods.PRINTER_INFO_2>(buffer);
+                return Marshal.PtrToStructure<NativeMethods.PRINTER_INFO_2>(printerInfoBuffer);
             }
             finally
             {
-                Marshal.FreeHGlobal(buffer);
+                Marshal.FreeHGlobal(printerInfoBuffer);
             }
         }
         finally
         {
-            NativeMethods.ClosePrinter(handle);
+            NativeMethods.ClosePrinter(printerHandle);
         }
     }
 
@@ -841,7 +842,7 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                 2,
                 IntPtr.Zero,
                 0,
-                out var needed,
+                out var requiredBufferSize,
                 out _))
         {
             var error = Marshal.GetLastWin32Error();
@@ -853,12 +854,12 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
         }
 
         // Validação de conteúdo: sem dados necessários, retorna lista vazia.
-        if (needed == 0)
+        if (requiredBufferSize == 0)
         {
             return [];
         }
 
-        var buffer = Marshal.AllocHGlobal((int)needed);
+        var printerInfoBuffer = Marshal.AllocHGlobal((int)requiredBufferSize);
         try
         {
             // Validação da leitura efetiva no buffer alocado.
@@ -866,27 +867,27 @@ public sealed class PrintSpoolerService(IWppStatusProvider wppStatusProvider) : 
                     NativeMethods.PRINTER_ENUM_LOCAL | NativeMethods.PRINTER_ENUM_CONNECTIONS,
                     null,
                     2,
-                    buffer,
-                    needed,
+                    printerInfoBuffer,
+                    requiredBufferSize,
                     out _,
-                    out var returned))
+                    out var returnedPrinterCount))
             {
                 ThrowLastWin32("EnumPrinters failed.");
             }
 
-            var list = new List<NativeMethods.PRINTER_INFO_2>((int)returned);
-            var structSize = Marshal.SizeOf<NativeMethods.PRINTER_INFO_2>();
-            for (var i = 0; i < returned; i++)
+            var printers = new List<NativeMethods.PRINTER_INFO_2>((int)returnedPrinterCount);
+            var printerInfoStructSize = Marshal.SizeOf<NativeMethods.PRINTER_INFO_2>();
+            for (var index = 0; index < returnedPrinterCount; index++)
             {
-                var ptr = IntPtr.Add(buffer, i * structSize);
-                list.Add(Marshal.PtrToStructure<NativeMethods.PRINTER_INFO_2>(ptr));
+                var currentPrinterInfoPtr = IntPtr.Add(printerInfoBuffer, index * printerInfoStructSize);
+                printers.Add(Marshal.PtrToStructure<NativeMethods.PRINTER_INFO_2>(currentPrinterInfoPtr));
             }
 
-            return list;
+            return printers;
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            Marshal.FreeHGlobal(printerInfoBuffer);
         }
     }
 

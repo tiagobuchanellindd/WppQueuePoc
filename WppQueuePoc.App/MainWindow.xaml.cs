@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Linq;
 using System.Text;
 using System.Windows;
 using WppQueuePoc.Abstractions;
@@ -8,7 +6,7 @@ using WppQueuePoc.Services;
 
 namespace WppQueuePoc.App
 {
-    public partial class MainWindow : Window
+    public partial class MainWindow : System.Windows.Window
     {
         private readonly IWppStatusProvider _wppStatusProvider;
         private readonly IPrintSpoolerService _printSpoolerService;
@@ -80,13 +78,18 @@ namespace WppQueuePoc.App
             return ShowValidationWarning(commandName, "Please provide at least one ticket field: Duplexing, OutputColor, or Orientation.");
         }
 
-        private async Task ExecuteAsync(string commandName, Func<string> action)
+        /// <summary>
+        /// Runs a command on a background thread to keep UI responsive, while standardizing status/output updates.
+        /// On success, appends result and invokes an optional callback; on failure, logs exception details.
+        /// </summary>
+        private async Task ExecuteAsync(string commandName, Func<string> action, Action? onSuccess = null)
         {
             ClearOutput();
             StatusTextBlock.Text = $"Running: {commandName}";
             try
             {
                 var result = await Task.Run(action);
+                onSuccess?.Invoke();
                 AppendOutput($"> {commandName}");
                 AppendOutput(result);
                 StatusTextBlock.Text = $"Ready ({commandName})";
@@ -101,9 +104,9 @@ namespace WppQueuePoc.App
 
         private static string NormalizeOptional(string s) => string.IsNullOrWhiteSpace(s) ? "" : s.Trim();
 
-        private static string ResolveQueueName(string nomeDoCampo, string? nomeAtual)
+        private static string ResolveQueueName(string queueNameFromField, string? currentQueueName)
         {
-            return !string.IsNullOrWhiteSpace(nomeDoCampo) ? nomeDoCampo.Trim() : (nomeAtual ?? "");
+            return !string.IsNullOrWhiteSpace(queueNameFromField) ? queueNameFromField.Trim() : (currentQueueName ?? "");
         }
 
         private void SetCurrentQueue(string? queueName)
@@ -132,75 +135,100 @@ namespace WppQueuePoc.App
             AppendOutput("Ready to create new print queue.");
         }
 
-        private void OnWppStatusClick(object sender, RoutedEventArgs e)
+        private async void OnWppStatusClick(object sender, RoutedEventArgs e)
         {
-            ClearOutput();
-            var status = _wppStatusProvider.GetWppStatus();
-            AppendOutput(status.ToString());
+            await ExecuteAsync("wpp-status", () => _wppStatusProvider.GetWppStatus().ToString());
         }
 
-        private void OnListQueuesClick(object sender, RoutedEventArgs e)
+        private async void OnListQueuesClick(object sender, RoutedEventArgs e)
         {
-            ClearOutput();
-            var queues = _printSpoolerService.ListQueues();
-            AppendOutput("Installed queues:");
-            foreach (var queue in queues)
+            await ExecuteAsync("list-queues", () =>
             {
-                AppendOutput($"- {queue.Name} ({queue.DriverName} @ {queue.PortName})");
-            }
+                var queues = _printSpoolerService.ListQueues();
+                var output = new StringBuilder();
+                output.AppendLine("Installed queues:");
+                foreach (var queue in queues)
+                {
+                    output.AppendLine($"- Printer: {queue.Name} (Driver: {queue.DriverName} / Port: {queue.PortName})");
+                }
+
+                return output.ToString();
+            });
         }
 
-        private void OnListPortsClick(object sender, RoutedEventArgs e)
+        private async void OnListPortsClick(object sender, RoutedEventArgs e)
         {
-            ClearOutput();
-            var ports = _printSpoolerService.ListPorts();
-            AppendOutput("Ports:");
-            foreach (var port in ports)
+            await ExecuteAsync("list-ports", () =>
             {
-                AppendOutput($"- {port}");
-            }
+                var ports = _printSpoolerService.ListPorts();
+                var output = new StringBuilder();
+                output.AppendLine("Ports:");
+                foreach (var port in ports)
+                {
+                    output.AppendLine($"- {port}");
+                }
+
+                return output.ToString();
+            });
         }
 
-        private void OnListDriversClick(object sender, RoutedEventArgs e)
+        private async void OnListDriversClick(object sender, RoutedEventArgs e)
         {
-            ClearOutput();
-            var drivers = _printSpoolerService.ListDrivers();
-            AppendOutput("Drivers:");
-            foreach (var driver in drivers)
+            await ExecuteAsync("list-drivers", () =>
             {
-                AppendOutput($"- {driver}");
-            }
+                var drivers = _printSpoolerService.ListDrivers();
+                var output = new StringBuilder();
+                output.AppendLine("Drivers:");
+                foreach (var driver in drivers)
+                {
+                    output.AppendLine($"- {driver}");
+                }
+
+                return output.ToString();
+            });
         }
 
-        private void OnListProcessorsClick(object sender, RoutedEventArgs e)
+        private async void OnListProcessorsClick(object sender, RoutedEventArgs e)
         {
-            ClearOutput();
-            var processors = _printSpoolerService.ListPrintProcessors();
-            AppendOutput("Print processors:");
-            foreach (var proc in processors)
+            await ExecuteAsync("list-processors", () =>
             {
-                AppendOutput($"- {proc}");
-            }
+                var processors = _printSpoolerService.ListPrintProcessors();
+                var output = new StringBuilder();
+                output.AppendLine("Print processors:");
+                foreach (var processor in processors)
+                {
+                    output.AppendLine($"- {processor}");
+                }
+
+                return output.ToString();
+            });
         }
 
-        private void OnListDataTypesClick(object sender, RoutedEventArgs e)
+        private async void OnListDataTypesClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
-            var procName = PrintProcessorTextBox.Text;
-            if (string.IsNullOrWhiteSpace(procName))
+            var printProcessorName = PrintProcessorTextBox.Text;
+            if (string.IsNullOrWhiteSpace(printProcessorName))
             {
                 ShowValidationWarning("list-data-types", "Please specify the print processor name to see data types.");
                 return;
             }
-            var tipos = _printSpoolerService.ListDataTypes(procName);
-            AppendOutput($"Data types for {procName}:");
-            foreach (var t in tipos)
+
+            await ExecuteAsync("list-data-types", () =>
             {
-                AppendOutput($"- {t}");
-            }
+                var dataTypes = _printSpoolerService.ListDataTypes(printProcessorName);
+                var output = new StringBuilder();
+                output.AppendLine($"Data types for {printProcessorName}:");
+                foreach (var dataType in dataTypes)
+                {
+                    output.AppendLine($"- {dataType}");
+                }
+
+                return output.ToString();
+            });
         }
 
-        private void OnAddWsdPortClick(object sender, RoutedEventArgs e)
+        private async void OnAddWsdPortClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var port = PortNameTextBox.Text;
@@ -209,19 +237,15 @@ namespace WppQueuePoc.App
                 ShowValidationWarning("add-wsd-port", "Please enter the WSD port name.");
                 return;
             }
-            try
+
+            await ExecuteAsync("add-wsd-port", () =>
             {
                 _printSpoolerService.AddWsdPort(port);
-                AppendOutput($"WSD port '{port}' added.");
-            }
-            catch (Exception ex)
-            {
-                AppendOutput($"Error adding WSD port:\n{ex.Message}");
-                StatusTextBlock.Text = $"Error (Add WSD Port)";
-            }
+                return $"WSD port '{port}' added.";
+            });
         }
 
-        private void OnCreateQueueClick(object sender, RoutedEventArgs e)
+        private async void OnCreateQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var queueName = QueueNameTextBox.Text;
@@ -239,23 +263,28 @@ namespace WppQueuePoc.App
                     ("Data Type", dataType)))
                 return;
 
-            _printSpoolerService.CreateQueue(queueName, driver, port, processor, dataType, comment, location);
-            AppendOutput($"Queue '{queueName}' created.");
-            SetCurrentQueue(queueName);
+            await ExecuteAsync(
+                "create-queue",
+                () =>
+                {
+                _printSpoolerService.CreateQueue(queueName, driver, port, processor, dataType, comment, location);
+                    return $"Queue '{queueName}' created.";
+                },
+                () => SetCurrentQueue(queueName));
         }
 
-        private void OnUpdateQueueClick(object sender, RoutedEventArgs e)
+        private async void OnUpdateQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
+            var currentQueueName = _currentQueueName;
             var newQueueName = NormalizeOptional(QueueNameTextBox.Text);
             var newDriverName = NormalizeOptional(DriverNameTextBox.Text);
             var newPortName = NormalizeOptional(PortNameTextBox.Text);
             var comment = NormalizeOptional(CommentTextBox.Text);
             var location = NormalizeOptional(LocationTextBox.Text);
             string queueName;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "update-queue", out queueName))
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "update-queue", out queueName))
                 return;
 
             var hasAnyUpdate =
@@ -271,29 +300,39 @@ namespace WppQueuePoc.App
                 return;
             }
 
-            _printSpoolerService.UpdateQueue(queueName, newQueueName, newDriverName, newPortName, comment, location);
-            AppendOutput($"Queue '{queueName}' updated.");
-            SetCurrentQueue(string.IsNullOrWhiteSpace(newQueueName) ? queueName : newQueueName);
+            await ExecuteAsync(
+                "update-queue",
+                () =>
+                {
+                _printSpoolerService.UpdateQueue(queueName, newQueueName, newDriverName, newPortName, comment, location);
+                    return $"Queue '{queueName}' updated.";
+                },
+                () => SetCurrentQueue(string.IsNullOrWhiteSpace(newQueueName) ? queueName : newQueueName));
         }
 
-        private void OnDeleteQueueClick(object sender, RoutedEventArgs e)
+        private async void OnDeleteQueueClick(object sender, RoutedEventArgs e)
         {
             ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "delete-queue", out var queueName))
+            var currentQueueName = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "delete-queue", out var queueName))
                 return;
 
-            _printSpoolerService.DeleteQueue(queueName);
-            AppendOutput($"Queue '{queueName}' deleted.");
-            SetCurrentQueue(null);
+            await ExecuteAsync(
+                "delete-queue",
+                () =>
+                {
+                _printSpoolerService.DeleteQueue(queueName);
+                    return $"Queue '{queueName}' deleted.";
+                },
+                () => SetCurrentQueue(null));
         }
 
         private async void OnInspectQueueClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "inspect", out var queueName))
+            var currentQueueName = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "inspect", out var queueName))
                 return;
 
             await ExecuteAsync("inspect", () =>
@@ -312,8 +351,8 @@ namespace WppQueuePoc.App
         private async void OnTicketInfoClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-info-default", out var queueName))
+            var currentQueueName = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "ticket-info-default", out var queueName))
                 return;
 
             await ExecuteAsync("ticket-info (default)", () =>
@@ -326,8 +365,8 @@ namespace WppQueuePoc.App
         private async void OnTicketUserInfoClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-info-user", out var queueName))
+            var currentQueueName = _currentQueueName;
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "ticket-info-user", out var queueName))
                 return;
 
             await ExecuteAsync("ticket-info (user)", () =>
@@ -340,11 +379,11 @@ namespace WppQueuePoc.App
         private async void OnTicketDefaultUpdateClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
+            var currentQueueName = _currentQueueName;
             var ticketDuplexing = TicketDuplexingTextBox.Text;
             var ticketOutputColor = TicketOutputColorTextBox.Text;
             var ticketOrientation = TicketOrientationTextBox.Text;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-update-default", out var queueName))
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "ticket-update-default", out var queueName))
                 return;
 
             if (!ValidateTicketUpdateInput("ticket-update-default", ticketDuplexing, ticketOutputColor, ticketOrientation))
@@ -365,11 +404,11 @@ namespace WppQueuePoc.App
         private async void OnTicketUserUpdateClick(object sender, RoutedEventArgs e)
         {
             var queueNameRaw = QueueNameTextBox.Text;
-            var currQueue = _currentQueueName;
+            var currentQueueName = _currentQueueName;
             var ticketDuplexing = TicketDuplexingTextBox.Text;
             var ticketOutputColor = TicketOutputColorTextBox.Text;
             var ticketOrientation = TicketOrientationTextBox.Text;
-            if (!TryGetQueueNameOrWarn(queueNameRaw, currQueue, "ticket-update-user", out var queueName))
+            if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "ticket-update-user", out var queueName))
                 return;
 
             if (!ValidateTicketUpdateInput("ticket-update-user", ticketDuplexing, ticketOutputColor, ticketOrientation))

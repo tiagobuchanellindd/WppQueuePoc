@@ -16,19 +16,19 @@ namespace WppQueuePoc.Services;
 [SupportedOSPlatform("windows")]
 public sealed class WppRegistryService : IWppStatusProvider
 {
-    private static readonly RegistryProbe[] Probes =
+    private static readonly PolicyStatusCheck[] StatusChecks =
     [
         //Acessar via Editor de Registro (ou regedit) => Computador\HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows NT\Printers\WPP
         new(
             @"SOFTWARE\Policies\Microsoft\Windows NT\Printers\WPP",
             "WindowsProtectedPrintGroupPolicyState",
-            EnabledValue: 1,
-            DisabledValue: 0),
+            EnabledWhen: 1,
+            DisabledWhen: 0),
         new(
             @"SOFTWARE\Policies\Microsoft\Windows NT\Printers\WPP",
             "WindowsProtectedPrintMode",
-            EnabledValue: 1,
-            DisabledValue: 0)
+            EnabledWhen: 1,
+            DisabledWhen: 0)
     ];
 
     /// <summary>
@@ -51,9 +51,9 @@ public sealed class WppRegistryService : IWppStatusProvider
     {
         WppStatusResult? disabledCandidate = null;
 
-        foreach (var probe in Probes)
+        foreach (var statusCheck in StatusChecks)
         {
-            using var key = Registry.LocalMachine.OpenSubKey(probe.Path, writable: false);
+            using var key = Registry.LocalMachine.OpenSubKey(statusCheck.RegistryPath, writable: false);
 
             // Validação de existência: se a chave não existe, tenta o próximo mapeamento conhecido.
             if (key is null)
@@ -61,51 +61,51 @@ public sealed class WppRegistryService : IWppStatusProvider
                 continue;
             }
 
-            var raw = key.GetValue(probe.ValueName);
+            var rawValue = key.GetValue(statusCheck.PolicyValueName);
             // Validação de valor: se o valor não existe neste probe, tenta o próximo fallback.
-            if (raw is null)
+            if (rawValue is null)
             {
                 continue;
             }
 
             // Validação de tipo: só aceita tipos que conseguimos converter com segurança.
-            if (!TryConvertToInt(raw, out var value))
+            if (!TryConvertToInt(rawValue, out var numericValue))
             {
                 return new WppStatusResult(
                     WppStatus.Unknown,
-                    $@"HKLM\{probe.Path}\{probe.ValueName}",
-                    $"Unsupported value type: {raw.GetType().Name}.",
+                    $@"HKLM\{statusCheck.RegistryPath}\{statusCheck.PolicyValueName}",
+                    $"Unsupported value type: {rawValue.GetType().Name}.",
                     null);
             }
 
             // Validação semântica: mapeia valor conhecido para "habilitado".
-            if (value == probe.EnabledValue)
+            if (numericValue == statusCheck.EnabledWhen)
             {
                 return new WppStatusResult(
                     WppStatus.Enabled,
-                    $@"HKLM\{probe.Path}\{probe.ValueName}",
+                    $@"HKLM\{statusCheck.RegistryPath}\{statusCheck.PolicyValueName}",
                     "Matched known enabled value.",
-                    value);
+                    numericValue);
             }
 
             // Validação semântica: mapeia valor conhecido para "desabilitado".
-            if (value == probe.DisabledValue)
+            if (numericValue == statusCheck.DisabledWhen)
             {
                 // Mantém como candidato e continua: um próximo probe pode indicar "habilitado".
                 disabledCandidate ??= new WppStatusResult(
                     WppStatus.Disabled,
-                    $@"HKLM\{probe.Path}\{probe.ValueName}",
+                    $@"HKLM\{statusCheck.RegistryPath}\{statusCheck.PolicyValueName}",
                     "Matched known disabled value.",
-                    value);
+                    numericValue);
                 continue;
             }
 
             // Validação final: valor fora do mapeamento conhecido, então o resultado é indeterminado.
             return new WppStatusResult(
                 WppStatus.Unknown,
-                $@"HKLM\{probe.Path}\{probe.ValueName}",
+                $@"HKLM\{statusCheck.RegistryPath}\{statusCheck.PolicyValueName}",
                 "Value found but does not match known enabled/disabled mapping.",
-                value);
+                numericValue);
         }
 
         if (disabledCandidate is not null)
@@ -132,25 +132,25 @@ public sealed class WppRegistryService : IWppStatusProvider
     /// <paramref name="result"/>; caso contrário, retorna
     /// <see langword="false"/> e define <paramref name="result"/> com o valor padrão.
     /// </summary>
-    private static bool TryConvertToInt(object value, out int result)
+    private static bool TryConvertToInt(object rawValue, out int numericValue)
     {
         // Validação de tipo nativo comum no Registry.
-        if (value is int i)
+        if (rawValue is int integerValue)
         {
-            result = i;
+            numericValue = integerValue;
             return true;
         }
 
         // Validação de fallback: alguns ambientes podem armazenar como texto numérico.
-        if (value is string s && int.TryParse(s, out var parsed))
+        if (rawValue is string stringValue && int.TryParse(stringValue, out var parsedValue))
         {
-            result = parsed;
+            numericValue = parsedValue;
             return true;
         }
 
-        result = default;
+        numericValue = default;
         return false;
     }
 
-    private sealed record RegistryProbe(string Path, string ValueName, int EnabledValue, int DisabledValue);
+    private sealed record PolicyStatusCheck(string RegistryPath, string PolicyValueName, int EnabledWhen, int DisabledWhen);
 }
