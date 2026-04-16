@@ -104,6 +104,8 @@ namespace WppQueuePoc.App
 
         private static string NormalizeOptional(string s) => string.IsNullOrWhiteSpace(s) ? "" : s.Trim();
 
+        private static string? NormalizeOptionalToNull(string s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
         private static string ResolveQueueName(string queueNameFromField, string? currentQueueName)
         {
             return !string.IsNullOrWhiteSpace(queueNameFromField) ? queueNameFromField.Trim() : (currentQueueName ?? "");
@@ -278,21 +280,21 @@ namespace WppQueuePoc.App
             ClearOutput();
             var queueNameRaw = QueueNameTextBox.Text;
             var currentQueueName = _currentQueueName;
-            var newQueueName = NormalizeOptional(QueueNameTextBox.Text);
-            var newDriverName = NormalizeOptional(DriverNameTextBox.Text);
-            var newPortName = NormalizeOptional(PortNameTextBox.Text);
-            var comment = NormalizeOptional(CommentTextBox.Text);
-            var location = NormalizeOptional(LocationTextBox.Text);
+            var newQueueName = NormalizeOptionalToNull(QueueNameTextBox.Text);
+            var newDriverName = NormalizeOptionalToNull(DriverNameTextBox.Text);
+            var newPortName = NormalizeOptionalToNull(PortNameTextBox.Text);
+            var comment = NormalizeOptionalToNull(CommentTextBox.Text);
+            var location = NormalizeOptionalToNull(LocationTextBox.Text);
             string queueName;
             if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "update-queue", out queueName))
                 return;
 
             var hasAnyUpdate =
-                !string.IsNullOrWhiteSpace(newQueueName) ||
-                !string.IsNullOrWhiteSpace(newDriverName) ||
-                !string.IsNullOrWhiteSpace(newPortName) ||
-                !string.IsNullOrWhiteSpace(comment) ||
-                !string.IsNullOrWhiteSpace(location);
+                newQueueName is not null ||
+                newDriverName is not null ||
+                newPortName is not null ||
+                comment is not null ||
+                location is not null;
 
             if (!hasAnyUpdate)
             {
@@ -335,16 +337,39 @@ namespace WppQueuePoc.App
             if (!TryGetQueueNameOrWarn(queueNameRaw, currentQueueName, "inspect", out var queueName))
                 return;
 
+            QueueInfo? queueInfo = null;
             await ExecuteAsync("inspect", () =>
             {
                 var result = _printSpoolerService.InspectQueue(queueName);
+                queueInfo = _printSpoolerService
+                    .ListQueues()
+                    .FirstOrDefault(q => string.Equals(q.Name, queueName, StringComparison.OrdinalIgnoreCase));
+
                 var sb = new StringBuilder();
                 sb.AppendLine($"[Inspect] Queue: {queueName}");
                 sb.AppendLine($"  - Port: {result.PortName}");
+                if (queueInfo is not null)
+                {
+                    sb.AppendLine($"  - Driver: {queueInfo.DriverName}");
+                    sb.AppendLine($"  - Comment: {queueInfo.Comment}");
+                    sb.AppendLine($"  - Location: {queueInfo.Location}");
+                }
                 sb.AppendLine($"  - GlobalWpp: {result.GlobalWppStatus}");
                 sb.AppendLine($"  - Classification: {result.Classification}");
                 sb.AppendLine($"  - Details: {result.Details}");
                 return sb.ToString();
+            },
+            () =>
+            {
+                if (queueInfo is null)
+                    return;
+
+                QueueNameTextBox.Text = queueInfo.Name;
+                DriverNameTextBox.Text = queueInfo.DriverName;
+                PortNameTextBox.Text = queueInfo.PortName;
+                CommentTextBox.Text = queueInfo.Comment;
+                LocationTextBox.Text = queueInfo.Location;
+                SetCurrentQueue(queueInfo.Name);
             });
         }
 
