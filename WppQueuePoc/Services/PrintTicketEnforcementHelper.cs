@@ -12,45 +12,42 @@ namespace WppQueuePoc.Services
     /// </summary>
     public static class PrintTicketEnforcementHelper
     {
+        private const string FIXED_DUPLEX = "TwoSidedLongEdge";
+        private const string FIXED_COLOR = "Monochrome";
+        private const string FIXED_ORIENTATION = "Portrait";
+
         public static PrintTicketEnforcementResult EnforceDefaultTicketPolicy(
             IPrintTicketService service,
-            string queueName,
-            PrinterPolicyEnforcer.Policy policy)
+            string queueName)
         {
-            // 1. Lê ticket atual
             var info = service.GetDefaultTicketInfo(queueName);
             if (!info.Available)
             {
-                return new PrintTicketEnforcementResult(false, "Não foi possível ler PrintTicket atual: " + info.Details, false);
+                return new PrintTicketEnforcementResult(false, "Não foi possível ler PrintTicket: " + info.Details, false);
             }
+
             var changes = new Dictionary<string, string?>();
             bool requiresUpdate = false;
-            if (policy.EnforceDuplex && policy.RequiredDuplexValue != null)
+
+            info.Attributes.TryGetValue("Duplexing", out var curDuplex);
+            if (!string.Equals(curDuplex, FIXED_DUPLEX, StringComparison.OrdinalIgnoreCase))
             {
-                info.Attributes.TryGetValue("Duplexing", out var curValue);
-                if (!string.Equals(curValue, policy.RequiredDuplexValue, StringComparison.OrdinalIgnoreCase))
-                {
-                    changes["Duplexing"] = policy.RequiredDuplexValue;
-                    requiresUpdate = true;
-                }
+                changes["Duplexing"] = FIXED_DUPLEX;
+                requiresUpdate = true;
             }
-            if (policy.EnforceColor && policy.RequiredColorValue != null)
+
+            info.Attributes.TryGetValue("OutputColor", out var curColor);
+            if (!string.Equals(curColor, FIXED_COLOR, StringComparison.OrdinalIgnoreCase))
             {
-                info.Attributes.TryGetValue("OutputColor", out var curValue);
-                if (!string.Equals(curValue, policy.RequiredColorValue, StringComparison.OrdinalIgnoreCase))
-                {
-                   changes["OutputColor"] = policy.RequiredColorValue;
-                   requiresUpdate = true;
-                }
+                changes["OutputColor"] = FIXED_COLOR;
+                requiresUpdate = true;
             }
-            if (policy.EnforceOrientation && policy.RequiredOrientationValue != null)
+
+            info.Attributes.TryGetValue("PageOrientation", out var curOrientation);
+            if (!string.Equals(curOrientation, FIXED_ORIENTATION, StringComparison.OrdinalIgnoreCase))
             {
-                info.Attributes.TryGetValue("PageOrientation", out var curValue);
-                if (!string.Equals(curValue, policy.RequiredOrientationValue, StringComparison.OrdinalIgnoreCase))
-                {
-                   changes["PageOrientation"] = policy.RequiredOrientationValue;
-                   requiresUpdate = true;
-                }
+                changes["PageOrientation"] = FIXED_ORIENTATION;
+                requiresUpdate = true;
             }
 
             if (!requiresUpdate)
@@ -61,22 +58,33 @@ namespace WppQueuePoc.Services
             var request = new PrintTicketUpdateRequest(
                 changes.ContainsKey("Duplexing") ? changes["Duplexing"] : null,
                 changes.ContainsKey("OutputColor") ? changes["OutputColor"] : null,
-                changes.ContainsKey("PageOrientation") ? changes["PageOrientation"] : null
-            );
+                changes.ContainsKey("PageOrientation") ? changes["PageOrientation"] : null);
+
             var update = service.UpdateDefaultTicket(queueName, request);
 
             if (update.Applied)
-                return new PrintTicketEnforcementResult(true, "Enforcement realizado com sucesso.", true);
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("Enforcement realizado com sucesso.");
+                sb.AppendLine($"  Duplexing: {curDuplex} → {FIXED_DUPLEX}");
+                sb.AppendLine($"  OutputColor: {curColor} → {FIXED_COLOR}");
+                sb.AppendLine($"  PageOrientation: {curOrientation} → {FIXED_ORIENTATION}");
+                return new PrintTicketEnforcementResult(true, sb.ToString(), true);
+            }
             else
+            {
                 return new PrintTicketEnforcementResult(false, "Falha ao aplicar enforcement: " + update.Details, true);
+            }
         }
-    }
 
-    /// <summary>
-    /// Resultado estruturado do enforcement.
-    /// </summary>
-    public sealed record PrintTicketEnforcementResult(
-        bool Success,
-        string Details,
-        bool AttemptedChange);
+        /// <summary>
+        /// Resultado estruturado do enforcement.
+        /// </summary>
+        public sealed record PrintTicketEnforcementResult(
+            bool Success,
+            string Details,
+            bool AttemptedChange);
+    }
 }
+
+

@@ -34,7 +34,6 @@ namespace WppQueuePoc.Services
         private volatile bool _flagsEnforcementPending = false;
         private readonly object _enforcementLock = new();
 
-        private readonly Policy _policy;
         private readonly IPrintTicketService _printTicketService;
         private CancellationTokenSource? _cts;
         private Task? _monitorTask;
@@ -47,7 +46,6 @@ namespace WppQueuePoc.Services
 
         public PrinterPolicyEnforcer(Policy policy, IPrintTicketService printTicketService)
         {
-            _policy = policy;
             _printTicketService = printTicketService;
         }
 
@@ -190,7 +188,7 @@ namespace WppQueuePoc.Services
                     try
                     {
                         var enforcement = PrintTicketEnforcementHelper.EnforceDefaultTicketPolicy(
-                            _printTicketService, _printerName, _policy);
+                            _printTicketService, _printerName);
                         _lastEnforcementUtc = DateTime.UtcNow;
                         EnforcementLog?.Invoke(this, "[Enforcement] " + enforcement.Details);
                     }
