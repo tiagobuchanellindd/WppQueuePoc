@@ -37,7 +37,7 @@ namespace WppQueuePoc.App
                 EnforceColor = true, RequiredColorValue = "Monochrome",
                 EnforceOrientation = true, RequiredOrientationValue = "Portrait"
             };
-            _policyEnforcer = new PrinterPolicyEnforcer(policy);
+            _policyEnforcer = new PrinterPolicyEnforcer(policy, _printTicketService);
             _policyEnforcer.StatusChanged += (s, msg) => Dispatcher.Invoke(() => AppendOutput($"[Policy] {msg}"));
             _policyEnforcer.EnforcementLog += (s, log) => Dispatcher.Invoke(() => AppendOutput($"[Policy] {log}"));
             _policyEnforcer.Error += (s, ex) => Dispatcher.Invoke(() => AppendOutput($"[Policy][ERROR] {ex.Message}"));
