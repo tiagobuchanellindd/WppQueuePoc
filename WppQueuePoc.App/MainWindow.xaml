@@ -1,4 +1,4 @@
-﻿<Window x:Class="WppQueuePoc.App.MainWindow"
+<Window x:Class="WppQueuePoc.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -76,6 +76,7 @@
                 <Button Margin="0,0,8,8" Padding="10,5" Click="OnListDataTypesClick">List Data Types</Button>
                 <Button Margin="0,0,8,8" Padding="10,5" Click="OnAddWsdPortClick">Add WSD Port</Button>
                 <Button x:Name="CreateQueueButton" Margin="0,0,8,8" Padding="10,5" Click="OnCreateQueueClick">Create Queue</Button>
+<Button x:Name="PolicyMonitorButton" Margin="0,0,8,8" Padding="10,5" Click="OnTogglePolicyMonitorClick">Start Policy Monitor</Button>
                 <Button Margin="0,0,8,8" Padding="10,5" Click="OnUpdateQueueClick">Update Queue</Button>
                 <Button Margin="0,0,8,8" Padding="10,5" Click="OnDeleteQueueClick">Delete Queue</Button>
                 <Button Margin="0,0,8,8" Padding="10,5" Click="OnInspectQueueClick">Inspect Queue</Button>

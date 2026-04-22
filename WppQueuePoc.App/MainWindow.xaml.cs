@@ -8,6 +8,10 @@ namespace WppQueuePoc.App
 {
     public partial class MainWindow : System.Windows.Window
     {
+        // PrinterPolicyEnforcer instance and state
+        private PrinterPolicyEnforcer? _policyEnforcer;
+        private bool _isPolicyMonitorRunning = false;
+
         private readonly IWppStatusProvider _wppStatusProvider;
         private readonly IPrintSpoolerService _printSpoolerService;
         private readonly IPrintTicketService _printTicketService;
@@ -21,7 +25,24 @@ namespace WppQueuePoc.App
             PrintProcessorTextBox.Text = "WinPrint";
             DataTypeTextBox.Text = "RAW";
             SetCurrentQueue(null);
+
+            InitializePolicyEnforcer();
         }
+
+        private void InitializePolicyEnforcer()
+        {
+            var policy = new PrinterPolicyEnforcer.Policy
+            {
+                EnforceDuplex = true, RequiredDuplexValue = "TwoSidedLongEdge",
+                EnforceColor = true, RequiredColorValue = "Monochrome",
+                EnforceOrientation = true, RequiredOrientationValue = "Portrait"
+            };
+            _policyEnforcer = new PrinterPolicyEnforcer(policy);
+            _policyEnforcer.StatusChanged += (s, msg) => Dispatcher.Invoke(() => AppendOutput($"[Policy] {msg}"));
+            _policyEnforcer.EnforcementLog += (s, log) => Dispatcher.Invoke(() => AppendOutput($"[Policy] {log}"));
+            _policyEnforcer.Error += (s, ex) => Dispatcher.Invoke(() => AppendOutput($"[Policy][ERROR] {ex.Message}"));
+        }
+
 
         private void ClearOutput()
         {
@@ -480,6 +501,25 @@ namespace WppQueuePoc.App
                     sb.AppendLine("Error updating ticket: " + result.Details);
             }
             return sb.ToString();
+        }
+        private void OnTogglePolicyMonitorClick(object sender, RoutedEventArgs e)
+        {
+            if (_policyEnforcer == null) return;
+
+            if (_isPolicyMonitorRunning)
+            {
+                _policyEnforcer.Stop();
+                _isPolicyMonitorRunning = false;
+                PolicyMonitorButton.Content = "Start Policy Monitor";
+                AppendOutput("[Policy] Policy monitor stopped.");
+            }
+            else
+            {
+                _policyEnforcer.Start();
+                _isPolicyMonitorRunning = true;
+                PolicyMonitorButton.Content = "Stop Policy Monitor";
+                AppendOutput("[Policy] Policy monitor started.");
+            }
         }
     }
 }
