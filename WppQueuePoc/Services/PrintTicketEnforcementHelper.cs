@@ -12,13 +12,11 @@ namespace WppQueuePoc.Services
     /// </summary>
     public static class PrintTicketEnforcementHelper
     {
-        private const string FIXED_DUPLEX = "TwoSidedLongEdge";
-        private const string FIXED_COLOR = "Monochrome";
-        private const string FIXED_ORIENTATION = "Portrait";
 
         public static PrintTicketEnforcementResult EnforceDefaultTicketPolicy(
-            IPrintTicketService service,
-            string queueName)
+        IPrintTicketService service,
+        string queueName,
+        PrinterPolicyEnforcer.Policy policy)
         {
             var info = service.GetDefaultTicketInfo(queueName);
             if (!info.Available)
@@ -29,25 +27,34 @@ namespace WppQueuePoc.Services
             var changes = new Dictionary<string, string?>();
             bool requiresUpdate = false;
 
-            info.Attributes.TryGetValue("Duplexing", out var curDuplex);
-            if (!string.Equals(curDuplex, FIXED_DUPLEX, StringComparison.OrdinalIgnoreCase))
+            if (policy.EnforceDuplex && policy.RequiredDuplexValue != null)
             {
-                changes["Duplexing"] = FIXED_DUPLEX;
-                requiresUpdate = true;
+                info.Attributes.TryGetValue("Duplexing", out var curValue);
+                if (!string.Equals(curValue, policy.RequiredDuplexValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    changes["Duplexing"] = policy.RequiredDuplexValue;
+                    requiresUpdate = true;
+                }
             }
 
-            info.Attributes.TryGetValue("OutputColor", out var curColor);
-            if (!string.Equals(curColor, FIXED_COLOR, StringComparison.OrdinalIgnoreCase))
+            if (policy.EnforceColor && policy.RequiredColorValue != null)
             {
-                changes["OutputColor"] = FIXED_COLOR;
-                requiresUpdate = true;
+                info.Attributes.TryGetValue("OutputColor", out var curValue);
+                if (!string.Equals(curValue, policy.RequiredColorValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    changes["OutputColor"] = policy.RequiredColorValue;
+                    requiresUpdate = true;
+                }
             }
 
-            info.Attributes.TryGetValue("PageOrientation", out var curOrientation);
-            if (!string.Equals(curOrientation, FIXED_ORIENTATION, StringComparison.OrdinalIgnoreCase))
+            if (policy.EnforceOrientation && policy.RequiredOrientationValue != null)
             {
-                changes["PageOrientation"] = FIXED_ORIENTATION;
-                requiresUpdate = true;
+                info.Attributes.TryGetValue("PageOrientation", out var curValue);
+                if (!string.Equals(curValue, policy.RequiredOrientationValue, StringComparison.OrdinalIgnoreCase))
+                {
+                    changes["PageOrientation"] = policy.RequiredOrientationValue;
+                    requiresUpdate = true;
+                }
             }
 
             if (!requiresUpdate)
@@ -66,9 +73,12 @@ namespace WppQueuePoc.Services
             {
                 var sb = new System.Text.StringBuilder();
                 sb.AppendLine("Enforcement realizado com sucesso.");
-                sb.AppendLine($"  Duplexing: {curDuplex} → {FIXED_DUPLEX}");
-                sb.AppendLine($"  OutputColor: {curColor} → {FIXED_COLOR}");
-                sb.AppendLine($"  PageOrientation: {curOrientation} → {FIXED_ORIENTATION}");
+                if (changes.ContainsKey("Duplexing"))
+                    sb.AppendLine($"  Duplexing: {info.Attributes["Duplexing"]} → {policy.RequiredDuplexValue}");
+                if (changes.ContainsKey("OutputColor"))
+                    sb.AppendLine($"  OutputColor: {info.Attributes["OutputColor"]} → {policy.RequiredColorValue}");
+                if (changes.ContainsKey("PageOrientation"))
+                    sb.AppendLine($"  PageOrientation: {info.Attributes["PageOrientation"]} → {policy.RequiredOrientationValue}");
                 return new PrintTicketEnforcementResult(true, sb.ToString(), true);
             }
             else
@@ -84,6 +94,7 @@ namespace WppQueuePoc.Services
             bool Success,
             string Details,
             bool AttemptedChange);
+
     }
 }
 

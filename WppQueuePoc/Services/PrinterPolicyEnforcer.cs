@@ -190,7 +190,7 @@ namespace WppQueuePoc.Services
                     try
                     {
                         var enforcement = PrintTicketEnforcementHelper.EnforceDefaultTicketPolicy(
-                            _printTicketService, _printerName);
+                            _printTicketService, _printerName, _policy);
                         _lastEnforcementUtc = DateTime.UtcNow;
                         EnforcementLog?.Invoke(this, "[Enforcement] " + enforcement.Details);
                     }
