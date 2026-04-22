@@ -11,7 +11,9 @@ namespace WppQueuePoc.Services
     /// </summary>
     public class PrinterPolicyEnforcer : IDisposable
     {
-        // Configuração de políticas (quais propriedades, valores)
+        /// <summary>
+        /// Configuração de políticas (quais propriedades, valores).
+        /// </summary>
         public class Policy
         {
             public bool EnforceDuplex { get; set; }
@@ -20,15 +22,19 @@ namespace WppQueuePoc.Services
             public string? RequiredColorValue { get; set; }
             public bool EnforceOrientation { get; set; }
             public string? RequiredOrientationValue { get; set; }
-            // Adicione mais propriedades conforme a extensão da Print Schema
         }
 
         public event EventHandler<string>? StatusChanged;
         public event EventHandler<string>? EnforcementLog;
         public event EventHandler<Exception>? Error;
 
+        private CancellationTokenSource? _enforcementWorkerCts;
+        private Task? _enforcementWorkerTask;
+        private volatile bool _flagsEnforcementPending = false;
+        private readonly object _enforcementLock = new();
+
         private readonly Policy _policy;
-        private readonly WppQueuePoc.Abstractions.IPrintTicketService _printTicketService;
+        private readonly IPrintTicketService _printTicketService;
         private CancellationTokenSource? _cts;
         private Task? _monitorTask;
         private DateTime? _lastEnforcementUtc = null;
@@ -36,20 +42,23 @@ namespace WppQueuePoc.Services
 
         public bool IsRunning { get; private set; } = false;
 
-        // Por ora, fila fixa "Microsoft Print to PDF"; pode ser parametrizada futuramente
-        private const string DefaultPrinterName = "Microsoft Print to PDF";
+        private string _printerName = "Microsoft Print to PDF";
 
-        public PrinterPolicyEnforcer(Policy policy, WppQueuePoc.Abstractions.IPrintTicketService printTicketService)
+        public PrinterPolicyEnforcer(Policy policy, IPrintTicketService printTicketService)
         {
             _policy = policy;
             _printTicketService = printTicketService;
         }
 
-        public void Start()
+        public void Start(string? printerName)
         {
             if (IsRunning) return;
+            if (printerName != null) _printerName = printerName;
+
             _cts = new CancellationTokenSource();
             _monitorTask = Task.Run(() => MonitorLoop(_cts.Token));
+            _enforcementWorkerCts = new CancellationTokenSource();
+            _enforcementWorkerTask = Task.Run(() => EnforcementWorkerLoop(_enforcementWorkerCts.Token));
             IsRunning = true;
             StatusChanged?.Invoke(this, "PrinterPolicyEnforcer started.");
         }
@@ -60,6 +69,12 @@ namespace WppQueuePoc.Services
             _cts?.Cancel();
             IsRunning = false;
             StatusChanged?.Invoke(this, "PrinterPolicyEnforcer stopped.");
+
+            _enforcementWorkerCts?.Cancel();
+            try { _enforcementWorkerTask?.Wait(1000); } catch { }
+            _enforcementWorkerCts?.Dispose();
+            _enforcementWorkerTask = null;
+            _enforcementWorkerCts = null;
         }
 
         private async Task MonitorLoop(CancellationToken ct)
@@ -68,20 +83,18 @@ namespace WppQueuePoc.Services
             IntPtr hNotify = IntPtr.Zero;
             try
             {
-                // Abrir handle para a impressora fixa
                 var defaults = new NativeMethods.PRINTER_DEFAULTS
                 {
                     pDatatype = null,
                     pDevMode = IntPtr.Zero,
                     DesiredAccess = NativeMethods.PRINTER_ACCESS_USE
                 };
-                if (!NativeMethods.OpenPrinter(DefaultPrinterName, out hPrinter, ref defaults) || hPrinter == IntPtr.Zero)
+                if (!NativeMethods.OpenPrinter(_printerName, out hPrinter, ref defaults) || hPrinter == IntPtr.Zero)
                 {
-                    EnforcementLog?.Invoke(this, $"[Monitor] Falha ao abrir a impressora '{DefaultPrinterName}'.");
+                    EnforcementLog?.Invoke(this, $"[Monitor] Falha ao abrir a impressora '{_printerName}'.");
                     return;
                 }
 
-                // Monitorar mudanças (SET_PRINTER)
                 hNotify = PrinterChangeNotificationNative.FindFirstPrinterChangeNotification(
                     hPrinter,
                     PrinterChangeNotificationNative.PRINTER_CHANGE_SET_PRINTER,
@@ -94,35 +107,35 @@ namespace WppQueuePoc.Services
                     return;
                 }
 
-                EnforcementLog?.Invoke(this, $"[Monitor] Aguardando eventos em '{DefaultPrinterName}'.");
-
+                EnforcementLog?.Invoke(this, $"[Monitor] Aguardando eventos em '{_printerName}'.");
                 while (!ct.IsCancellationRequested)
                 {
                     int waitResult = PrinterChangeNotificationNative.WaitForSingleObject(hNotify, 2000);
                     if (waitResult == PrinterChangeNotificationNative.WAIT_OBJECT_0)
                     {
-                        // Evento de mudança capturado
                         if (PrinterChangeNotificationNative.FindNextPrinterChangeNotification(hNotify, out int change, IntPtr.Zero, out IntPtr notifyInfo))
                         {
-                                EnforcementLog?.Invoke(this, $"[Monitor] Mudança capturada na impressora: 0x{change:X} (provável alteração de propriedade)." );
-                                try
+                            EnforcementLog?.Invoke(this, $"[Monitor] Mudança capturada na impressora: 0x{change:X}.");
+                            try
+                            {
+                                var now = DateTime.UtcNow;
+                                if (_lastEnforcementUtc.HasValue && now - _lastEnforcementUtc.Value < _debounceInterval)
                                 {
-                                    var now = DateTime.UtcNow;
-                                    if (_lastEnforcementUtc.HasValue && now - _lastEnforcementUtc.Value < _debounceInterval)
-                                    {
-                                        EnforcementLog?.Invoke(this, $"[Enforcement] Ignorado devido ao debounce (aguardando intervalo de {_debounceInterval.TotalSeconds} segundos).");
-                                    }
-                                    else
-                                    {
-                                        var enforcement = PrintTicketEnforcementHelper.EnforceDefaultTicketPolicy(_printTicketService, DefaultPrinterName, _policy);
-                                        _lastEnforcementUtc = now;
-                                        EnforcementLog?.Invoke(this, $"[Enforcement] {enforcement.Details}");
-                                    }
+                                    EnforcementLog?.Invoke(this, $"[Enforcement] Ignorado (debounce de {_debounceInterval.TotalSeconds}s).");
                                 }
-                                catch (Exception enfEx)
+                                else
                                 {
-                                    EnforcementLog?.Invoke(this, $"[Enforcement][ERROR] {enfEx.Message}");
+                                    lock (_enforcementLock)
+                                    {
+                                        _flagsEnforcementPending = true;
+                                    }
+                                    EnforcementLog?.Invoke(this, "[Monitor] Enforcement pendente.");
                                 }
+                            }
+                            catch (Exception enfEx)
+                            {
+                                EnforcementLog?.Invoke(this, $"[Enforcement][ERROR] {enfEx.Message}");
+                            }
                         }
                         else
                         {
@@ -131,11 +144,11 @@ namespace WppQueuePoc.Services
                     }
                     else if (waitResult == PrinterChangeNotificationNative.WAIT_TIMEOUT)
                     {
-                        continue; // Timeout normal (verifica ct e repete)
+                        continue;
                     }
                     else
                     {
-                        EnforcementLog?.Invoke(this, "[Monitor] Erro inesperado ao aguardar evento de notificação.");
+                        EnforcementLog?.Invoke(this, "[Monitor] Erro inesperado ao aguardar evento.");
                         break;
                     }
                 }
@@ -154,7 +167,38 @@ namespace WppQueuePoc.Services
                 {
                     NativeMethods.ClosePrinter(hPrinter);
                 }
-                EnforcementLog?.Invoke(this, "[Monitor] Monitoramento finalizado e recursos liberados.");
+                EnforcementLog?.Invoke(this, "[Monitor] Monitoramento finalizado.");
+            }
+        }
+
+        private async Task EnforcementWorkerLoop(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                bool shouldEnforce = false;
+                lock (_enforcementLock)
+                {
+                    if (_flagsEnforcementPending)
+                    {
+                        _flagsEnforcementPending = false;
+                        shouldEnforce = true;
+                    }
+                }
+                if (shouldEnforce)
+                {
+                    try
+                    {
+                        var enforcement = PrintTicketEnforcementHelper.EnforceDefaultTicketPolicy(
+                            _printTicketService, _printerName, _policy);
+                        _lastEnforcementUtc = DateTime.UtcNow;
+                        EnforcementLog?.Invoke(this, "[Enforcement] " + enforcement.Details);
+                    }
+                    catch (Exception ex)
+                    {
+                        EnforcementLog?.Invoke(this, "[Enforcement][ERRO] " + ex.Message);
+                    }
+                }
+                await Task.Delay(500, ct);
             }
         }
 

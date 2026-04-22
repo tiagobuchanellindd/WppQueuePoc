@@ -16,6 +16,8 @@ namespace WppQueuePoc.App
         private readonly IPrintSpoolerService _printSpoolerService;
         private readonly IPrintTicketService _printTicketService;
         private string? _currentQueueName;
+        private QueueInfo? _currentQueueInfo = null;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -154,6 +156,7 @@ namespace WppQueuePoc.App
             TicketDuplexingTextBox.Text = "";
             TicketOutputColorTextBox.Text = "";
             TicketOrientationTextBox.Text = "";
+            _currentQueueInfo = null;
             SetCurrentQueue(null);
             AppendOutput("Ready to create new print queue.");
         }
@@ -378,6 +381,8 @@ namespace WppQueuePoc.App
                 sb.AppendLine($"  - GlobalWpp: {result.GlobalWppStatus}");
                 sb.AppendLine($"  - Classification: {result.Classification}");
                 sb.AppendLine($"  - Details: {result.Details}");
+                _currentQueueInfo = queueInfo;
+
                 return sb.ToString();
             },
             () =>
@@ -515,7 +520,8 @@ namespace WppQueuePoc.App
             }
             else
             {
-                _policyEnforcer.Start();
+                ClearOutput();
+                _policyEnforcer.Start(_currentQueueInfo?.Name);
                 _isPolicyMonitorRunning = true;
                 PolicyMonitorButton.Content = "Stop Policy Monitor";
                 AppendOutput("[Policy] Policy monitor started.");

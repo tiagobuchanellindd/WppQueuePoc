@@ -2,6 +2,7 @@ using WppQueuePoc.Abstractions;
 using WppQueuePoc.Models;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 namespace WppQueuePoc.Services;
 
 /// <summary>
@@ -67,6 +68,15 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 queueName,
                 Available: true,
                 Details: "Default print ticket information captured.",
+                Attributes: ticketSettings);
+        }
+        catch (TargetInvocationException tiex)
+        {
+            var inner = tiex.InnerException;
+            return new PrintTicketInfoResult(
+                queueName,
+                Available: false,
+                Details: $"Failed to read default print ticket information: {inner?.Message ?? tiex.Message}",
                 Attributes: ticketSettings);
         }
         catch (Exception ex)
@@ -136,6 +146,15 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 queueName,
                 Available: true,
                 Details: "User print ticket information captured.",
+                Attributes: ticketSettings);
+        }
+        catch (TargetInvocationException tiex)
+        {
+            var inner = tiex.InnerException;
+            return new PrintTicketInfoResult(
+                queueName,
+                Available: false,
+                Details: $"Failed to read user print ticket information: {inner?.Message ?? tiex.Message}",
                 Attributes: ticketSettings);
         }
         catch (Exception ex)
@@ -284,6 +303,17 @@ public sealed partial class PrintTicketService : IPrintTicketService
                 statusMessage,
                 requestedSettings,
                 appliedSettings);
+        }
+        catch (TargetInvocationException tiex)
+        {
+            var error = GetInnermostMessage(tiex.InnerException ?? tiex);
+            return new PrintTicketUpdateResult(
+                queueName,
+                ticketScope,
+                false,
+                $"Exception during PrintTicket update: {error}. This may occur if the process is not elevated and/or the account does not have 'Manage Printers' permission on this queue.",
+                requestedSettings,
+                new Dictionary<string, string>());
         }
         catch (Exception ex)
         {
