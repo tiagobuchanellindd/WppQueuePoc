@@ -1,36 +1,36 @@
 # Enforcement ativo de PrintTicket via Win32 API: arquitetura de monitoramento reativo
 
-Este estudo apresenta uma solucao de enforcement ativo para configuracões de impressao no Windows. Ele combina monitoramento de eventos via Win32 API com atualizacao automatica de PrintTicket para manter configuracoes alinhadas com politicas organizacionais.
+Este estudo apresenta uma solução de enforcement ativo para configurações de impressão no Windows. Ele combina monitoramento de eventos via Win32 API com atualização automática de PrintTicket para manter configurações alinhadas com políticas organizacionais.
 
 ## 1) Contexto e problema
 
-Em ambientes corporativos, ha necessidade de garantir que impressoras mantenham configuracões fixas, como por exemplo:
+Em ambientes corporativos, há necessidade de garantir que impressoras mantenham configurações fixes, como por exemplo:
 
-- duplex forcado (frente e verso)
-- cor forcada (monochrome)
-- orientacao fixa (portrait ou landscape)
+- duplex forçado (frente e verso)
+- cor forçada (monochrome)
+- orientação fixa (portrait ou landscape)
 
-Usuarios podem alterar essas configuracoes manualmente via driver ou dialogo de impressao, e a organizacao precisa reverter essas mudancas para garantir conformidade.
+Usuários podem alterar essas configurações manualmente via driver ou diálogo de impressão, e a organização precisa reverter essas mudanças para garantir conformidade.
 
 Abordagens tradicionais:
 
-- GPO (Group Policy): funciona para politicas de driver, mas nao para todas as propriedades
-- Logon script: executa uma vez, nao reage a mudancas subsequentes
-- Monitoramento manual: dependencia de operacao constante
+- GPO (Group Policy): funciona para políticas de driver, mas não para todas as propriedades
+- Logon script: executa uma vez, não reage a mudanças subsequentes
+- Monitoramento manual: dependência de operação constante
 
-Solucao proposta: **Enforcement Ativo** monitore eventos da impressora e restaure configuracoes automaticamente.
+Solução proposta: **Enforcement Ativo** monitore eventos da impressora e restaure configurações automaticamente.
 
-## 2) Visao geral da solucao
+## 2) Visão geral da solução
 
-A solucao e composta por dois componentes principais:
+A solução é composta por dois componentes principais:
 
-- **PrinterPolicyEnforcer**: monitora eventos de mudanca via Win32 API e coordena o fluxo de enforcement
-- **PrintTicketEnforcementHelper**: helper estatico que compara configuracoes atuais com a politica e aplica correcoes
+- **PrinterPolicyEnforcer**: monitora eventos de mudança via Win32 API e coordena o fluxo de enforcement
+- **PrintTicketEnforcementHelper**: helper estático que compara configurações atuais com a política e aplica correções
 
 ### Fluxo conceitual
 
 ```
-[Impressora] --(evento de mudanca)--> [MonitorLoop]
+[Impressora] --(evento de mudança)--> [MonitorLoop]
                                           |
                                           V
                                   [Flag pendente]
@@ -48,9 +48,9 @@ A solucao e composta por dois componentes principais:
                               [PrintTicket atualizado]
 ```
 
-### Caracteristicas principais
+### Características principais
 
-- Reage a eventos ativos (nao apenas polling periodico)
+- Reage a eventos ativos (não apenas polling periódico)
 - Dois loops separados para responsividade
 - Debounce de 3 segundos para evitar loops infinitos
 - Falhas resilientes com log descritivo
@@ -75,35 +75,35 @@ public class Policy
 }
 ```
 
-Cada dimensiao tem:
+Cada dimensão tem:
 
-- flag (EnforceX): habilita monitoramento forcar
+- flag (EnforceX): habilita monitoramento forçar
 - valor (RequiredXValue): valor que deve ser restaurado
 
 Valores null ou EnforceX=false significa "ignorar esta propriedade".
 
 ### 3.2 Loop duplo
 
-A arquitetura usa dois loops asynconos separados:
+A arquitetura usa dois loops assíncronos separados:
 
 **MonitorLoop** (thread 1):
 
 - Espera eventos via Win32 API (bloqueante em WaitForSingleObject)
-- Quando detecta mudanca, marca flag pendente
-- Nao pode ser bloqueado por operacoes lentas
+- Quando detecta mudança, marca flag pendente
+- Não pode ser bloqueado por operações lentas
 
 **EnforcementWorkerLoop** (thread 2):
 
 - Poll a cada 500ms
 - verifica flag pendente
-- executa enforcement (leitura, comparacao, escrita)
+- executa enforcement (leitura, comparação, escrita)
 - Atualiza timestamp para debounce
 
-Beneficio: monitoramento permanece responsivo mesmo durante processamento de enforcement.
+Benefício: monitoramento permanece responsivo mesmo durante processamento de enforcement.
 
 ### 3.3 Flag e lock thread-safe
 
-Comunicacao entre loops:
+Comunicação entre loops:
 
 ```csharp
 private volatile bool _flagsEnforcementPending = false;
@@ -111,7 +111,7 @@ private readonly object _enforcementLock = new();
 ```
 
 - `volatile`: garante visibilidade entre threads
-- `lock`: protege acesso atomico
+- `lock`: protege acesso atômico
 
 ```csharp
 lock (_enforcementLock)
@@ -141,12 +141,12 @@ if (_lastEnforcementUtc.HasValue && now - _lastEnforcementUtc.Value < _debounceI
 Ciclo evitado:
 
 ```
-Mudanca detecta -> Enforcement aplicado -> Driver reporta Nova mudanca -> Enforcement aplicado -> ...
+Mudança detecta -> Enforcement aplicado -> Driver reporta Nova mudança -> Enforcement aplicado -> ...
 ```
 
-## 4) PrintTicketEnforcementHelper: logica de comparacao e aplicacao
+## 4) PrintTicketEnforcementHelper: lógica de comparação e aplicação
 
-### 4.1 Helper estatico para testabilidade
+### 4.1 Helper estático para testabilidade
 
 ```csharp
 public static class PrintTicketEnforcementHelper
@@ -161,18 +161,18 @@ public static class PrintTicketEnforcementHelper
 }
 ```
 
-Beneficios:
+Benefícios:
 
-- Sem estado, sem necessidade de instanciacao
+- Sem estado, sem necessidade de instânciação
 - Pode ser testado com mock de IPrintTicketService
 - Reuso em diferentes contextos
 
-### 4.2 Fluxo de comparacao
+### 4.2 Fluxo de comparação
 
 ```csharp
 var info = service.GetDefaultTicketInfo(queueName);
 if (!info.Available)
-    return failure("Nao foi possivel ler: " + info.Details);
+    return failure("Não foi possível ler: " + info.Details);
 
 var changes = new Dictionary<string, string?>();
 bool requiresUpdate = false;
@@ -188,13 +188,13 @@ if (policy.EnforceDuplex && policy.RequiredDuplexValue != null)
 }
 ```
 
-Comparacao case-insensitive: drivers podem retornar valores em diferentes capitalizacoes.
+Comparação case-insensitive: drivers podem retornar valores em diferentes capitalizações.
 
-### 4.3 Acumulo de mudancas
+### 4.3 Acúmulo de mudanças
 
 ```csharp
 if (!requiresUpdate)
-    return success("Ja em conformidade", attemptedChange: false);
+    return success("Já em conformidade", attemptedChange: false);
 
 var request = new PrintTicketUpdateRequest(
     changes.ContainsKey("Duplexing") ? changes["Duplexing"] : null,
@@ -204,13 +204,13 @@ var request = new PrintTicketUpdateRequest(
 var update = service.UpdateDefaultTicket(queueName, request);
 ```
 
-Unica chamada de update para multiplas propriedades (melhor performance).
+Única chamada de update para múltiplas propriedades (melhor performance).
 
 ### 4.4 Resultado estruturado
 
 ```csharp
 public sealed record PrintTicketEnforcementResult(
-    bool Success,        // Operacao global
+    bool Success,        // Operação global
     string Details,    // Mensagem descritiva
     bool AttemptedChange);  // Tentou mudar?
 ```
@@ -218,12 +218,12 @@ public sealed record PrintTicketEnforcementResult(
 Casos:
 
 ```
-Success=true, AttemptedChange=false  -> Ja estava conforme
+Success=true, AttemptedChange=false  -> Já estava conforme
 Success=true, AttemptedChange=true  -> Mudou com sucesso
 Success=false, AttemptedChange=true -> Tentou e falhou
 ```
 
-## 5) Integracao com Win32 API
+## 5) Integração com Win32 API
 
 ### 5.1 FindFirstPrinterChangeNotification
 
@@ -245,7 +245,7 @@ DWORD WaitForSingleObject(
     DWORD  dwMilliseconds);  // timeout
 ```
 
-Espera ate timeout ou sinal.
+Espera até timeout ou sinal.
 
 Retornos:
 
@@ -262,7 +262,7 @@ BOOL FindNextPrinterChangeNotification(
     ...);
 ```
 
-Avanca estado e retorna flags do evento.
+Avança estado e retorna flags do evento.
 
 ### 5.4 Flags de monitoramento
 
@@ -270,11 +270,11 @@ Avanca estado e retorna flags do evento.
 PrinterChangeNotificationNative.PRINTER_CHANGE_SET_PRINTER
 ```
 
-Detecta qualquer alteracao em configuracoes da impressora.
+Detecta qualquer alteração em configurações da impressora.
 
 ## 6) Fluxo de uso
 
-### Exemplo: forcar duplex e monochrome
+### Exemplo: forçar duplex e monochrome
 
 ```csharp
 var policy = new PrinterPolicyEnforcer.Policy
@@ -307,7 +307,7 @@ enforcer.EnforcementLog += (s, msg) =>
 
 // Log esperado:
 // [Monitor] Aguardando eventos em 'MinhaImpressora'.
-// [Monitor] Mudanca capturada na impressora: 0x4.
+// [Monitor] Mudança capturada na impressora: 0x4.
 // [Monitor] Enforcement pendente.
 // [Enforcement] Enforcement realizado com sucesso.
 //   Duplexing: OneSided -> TwoSidedLongEdge
@@ -316,25 +316,25 @@ enforcer.EnforcementLog += (s, msg) =>
 
 ## 7) Tratamento de erros
 
-### Falta de permissao
+### Falta de permissão
 
-Se o processo nao tem permissao de Manage Printers:
+Se o processo não tem permissão de Manage Printers:
 
 ```
 [Enforcement][ERRO] Exception during PrintTicket update
 ```
 
-Erro loggedo, NAO lanca excecao.
+Erro logado, NÃO lança exceção.
 
-### Driver nao suporta
+### Driver não suporta
 
-Se driver nao suporta propriedade:
+Se driver não suporta propriedade:
 
 ```
-Success=false, Details="Falha ao aplicar enforcement: Driver nao suporta..."
+Success=false, Details="Falha ao aplicar enforcement: Driver não suporta..."
 ```
 
-### Handle invalido
+### Handle inválido
 
 ```
 [Monitor] Falha ao abrir a impressora 'Nome'.
@@ -344,40 +344,40 @@ Success=false, Details="Falha ao aplicar enforcement: Driver nao suporta..."
 
 ```csharp
 public event EventHandler<string>? StatusChanged;    // Start/stop
-public event EventHandler<string>? EnforcementLog;  // Operacoes
-public event EventHandler<Exception>? Error;        // Excecoes
+public event EventHandler<string>? EnforcementLog;  // Operações
+public event EventHandler<Exception>? Error;        // Exceções
 ```
 
-## 9) Limites e observacoes
+## 9) Limites e observações
 
-- Requer permissao de gerenciamento na impressora (Manage Printers)
-- Nao detecta mudanca de driver (apenas propriedades)
-- Cada impressora precisa de instancia separada
-- Debounce de 3s pode ser ajustefino
-- Servico precisa de IPrintTicketService valido
+- Requer permissão de gerenciamento na impressora (Manage Printers)
+- Não detecta mudança de driver (apenas propriedades)
+- Cada impressora precisa de instância separada
+- Debounce de 3s pode ser ajuste fino
+- Serviço precisa de IPrintTicketService válido
 
-## 10) Comparacao com abordagens tradicionais
+## 10) Comparação com abordagens tradicionais
 
-| Abordagem | Reage a mudanca | Automatizacao | Complexidade |
+| Abordagem | Reage a mudança | Automatização | Complexidade |
 |---|---|---|---|
-| GPO | Parcial | Uma vez | Media |
-| Logon script | Nao | Uma vez | Baixa |
-| Monitoring manual | Nao | Nao | Baixa |
-| Enforcement Ativo | Sim | Contínua | Media |
+| GPO | Parcial | Uma vez | Média |
+| Logon script | Não | Uma vez | Baixa |
+| Monitoring manual | Não | Não | Baixa |
+| Enforcement Ativo | Sim | Contínua | Média |
 
-## 11) Checkpoint de implantacao
+## 11) Checkpoint de implantação
 
-1. Verificar permissao de Manage Printers na fila
+1. Verificar permissão de Manage Printers na fila
 2. Testar IPrintTicketService isoladamente
 3. Configurar Policy com valores desejados
 4. Iniciar enforcer e verificar eventos
-5. Ajustar debounce se necessario
-6. Configurar log para producao
+5. Ajustar debounce se necessário
+6. Configurar log para produção
 7. Planejar cleanup em shutdown
 
 ## 12) Estudo relacionado
 
-Este estudo complementa o estudo geral de PrintTicketService (docs/estudo/PrintTicketService). 
+Este estudo complementa o estudo geral de PrintTicketService (docs/estudo/PrintTicketService).
 O PrintTicketService fornece as capacidades de leitura/escrita que este enforcement consome.
 
 ## 13) POC

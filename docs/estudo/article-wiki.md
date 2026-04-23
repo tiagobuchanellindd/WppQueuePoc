@@ -1,40 +1,40 @@
-# Filas WPP no Windows: estudo tecnico de funcionamento e operacao
+# Filas WPP no Windows: estudo técnico de funcionamento e operação
 
-Este estudo apresenta uma camada tecnica para operacao de filas de impressao no Windows com foco em previsibilidade operacional.
-Ele concentra, em um fluxo unico, o ciclo de vida de filas no spooler, a leitura do contexto global de WPP, a inspecao heuristica de aderencia por fila e o diagnostico/ajuste de PrintTicket.
+Este estudo apresenta uma camada técnica para operação de filas de impressão no Windows com foco em previsibilidade operacional.
+Ele concentra, em um fluxo único, o ciclo de vida de filas no spooler, a leitura do contexto global de WPP, a inspeção heurística de aderência por fila e o diagnóstico/ajuste de PrintTicket.
 
 ## 1) Objetivo do estudo
 
-Em ambientes Windows, o comportamento de impressao muda conforme o contexto de politica global, driver e porta.
-O estudo foi estruturado para transformar esse cenario em um fluxo operacional previsivel e auditavel.
+Em ambientes Windows, o comportamento de impressão muda conforme o contexto de política global, driver e porta.
+O estudo foi estruturado para transformar esse cenário em um fluxo operacional previsível e auditável.
 
 Escopo implementado:
 
 1. ciclo de vida de fila no spooler: criar, listar, atualizar e remover;
 2. descoberta de recursos do host: portas, drivers, print processors e datatypes;
-3. administracao de porta WSD via Xcv (`AddPort`) com validacao de retorno;
-4. deteccao de status global WPP (`Enabled`, `Disabled`, `Unknown`);
-5. inspecao heuristica de fila (`LikelyWpp`, `LikelyNotWpp`, `Indeterminate`);
-6. leitura e atualizacao de PrintTicket em dois escopos:
+3. administração de porta WSD via Xcv (`AddPort`) com validação de retorno;
+4. detecção de status global WPP (`Enabled`, `Disabled`, `Unknown`);
+5. inspeção heurística de fila (`LikelyWpp`, `LikelyNotWpp`, `Indeterminate`);
+6. leitura e atualização de PrintTicket em dois escopos:
    - default da fila,
-   - user do usuario atual.
+   - usuário do usuário atual.
 
-Em resumo, a abordagem proposta encapsula APIs nativas complexas em servicos diretos para operacao, suporte e diagnostico.
+Em resumo, a abordagem proposta encapsula APIs nativas complexas em serviços diretos para operação, suporte e diagnóstico.
 
-## 2) Visao tecnica da solucao
+## 2) Visão técnica da solução
 
-A implementacao foi separada em quatro blocos simples:
+A implementação foi separada em quatro blocos simples:
 
 - **Contratos (Abstractions)**: definem o que pode ser feito.
-- **Services**: executam os fluxos de negocio/operacao.
+- **Services**: executam os fluxos de negócio/operação.
 - **Interop (Win32)**: concentra chamadas nativas (`winspool.drv`).
-- **Models**: padronizam entradas, saidas e classificacoes.
+- **Models**: padronizam entradas, saídas e classificações.
 
-Essa separacao evita espalhar detalhes de ponteiro/memoria Win32 por todo o codigo e melhora manutencao.
+Essa separacao evita espalhar detalhes de ponteiro/memória Win32 por todo o código e melhora manutenção.
 
-## 3) Capacidades publicas da solucao
+## 3) Capacidades públicas da solução
 
-### 3.1 Operacoes de spooler
+### 3.1 Operações de spooler
 
 - `AddWsdPort(portName)`
 - `CreateQueue(queueName, driverName, portName, printProcessor, dataType, comment, location)`
@@ -49,7 +49,7 @@ Essa separacao evita espalhar detalhes de ponteiro/memoria Win32 por todo o codi
 
 ### 3.2 Status global WPP
 
-- `GetWppStatus()` retorna status, origem da evidencia, detalhes e valor bruto quando existir.
+- `GetWppStatus()` retorna status, origem da evidência, detalhes e valor bruto quando existir.
 
 ### 3.3 PrintTicket
 
@@ -60,7 +60,7 @@ Essa separacao evita espalhar detalhes de ponteiro/memoria Win32 por todo o codi
 
 ## 4) Fluxo de uso ponta a ponta
 
-O passo a passo abaixo mostra a sequencia recomendada de uso.
+O passo a passo abaixo mostra a sequência recomendada de uso.
 
 ### Passo 1: descobrir estado global WPP
 
@@ -68,13 +68,13 @@ O passo a passo abaixo mostra a sequencia recomendada de uso.
 var wpp = wppStatusProvider.GetWppStatus();
 ```
 
-Por que comecar aqui:
+Por que começar aqui:
 
-- WPP e politica global do Windows;
-- isso influencia interpretacao de filas e portas;
-- melhora a qualidade do diagnostico desde o inicio.
+- WPP é política global do Windows;
+- isso influência interpretação de filas e portas;
+- melhora a qualidade do diagnóstico desde o início.
 
-### Passo 2: mapear opcoes validas do host
+### Passo 2: mapear opções válidas do host
 
 ```csharp
 var ports = spooler.ListPorts();
@@ -83,7 +83,7 @@ var processors = spooler.ListPrintProcessors();
 var dataTypes = spooler.ListDataTypes("WinPrint");
 ```
 
-Esse passo reduz erro de combinacao invalida (driver/processador/datatype).
+Esse passo reduz erro de combinação inválida (driver/processador/datatype).
 
 ### Passo 3: criar fila
 
@@ -98,7 +98,7 @@ spooler.CreateQueue(
     location: "Lab");
 ```
 
-Internamente, o servico monta `PRINTER_INFO_2`, aloca memoria nao gerenciada e chama `AddPrinter`.
+Internamente, o serviço monta `PRINTER_INFO_2`, aloca memória não gerenciada e chama `AddPrinter`.
 
 ### Passo 4: inspecionar fila no contexto WPP
 
@@ -106,13 +106,13 @@ Internamente, o servico monta `PRINTER_INFO_2`, aloca memoria nao gerenciada e c
 var inspection = spooler.InspectQueue("WPP-Queue-01");
 ```
 
-Classificacoes possiveis:
+Classificações possíveis:
 
 - `LikelyWpp`
 - `LikelyNotWpp`
 - `Indeterminate`
 
-A decisao combina sinais globais e sinais tecnicos da fila (porta e evidencia APMON quando disponivel).
+A decisão combina sinais globais e sinais técnicos da fila (porta e evidência APMON quando disponível).
 
 ### Passo 5: ler e ajustar PrintTicket
 
@@ -134,7 +134,7 @@ var request = new PrintTicketUpdateRequest(
 var result = ticketService.UpdateUserTicket("WPP-Queue-01", request);
 ```
 
-Regra pratica: sempre comparar `Requested` e `AppliedValues` para validar o que o driver realmente aceitou.
+Regra prática: sempre comparar `Requested` e `AppliedValues` para validar o que o driver realmente aceitou.
 
 ### Passo 6: manter ou encerrar ciclo
 
@@ -156,36 +156,36 @@ Delete:
 spooler.DeleteQueue("WPP-Queue-01-Renamed");
 ```
 
-## 5) Funcionamento interno dos servicos
+## 5) Funcionamento interno dos serviços
 
 ### 5.1 PrintSpoolerService
 
-E o nucleo operacional de fila. Centraliza criacao, atualizacao, exclusao, enumeracao de recursos (filas, portas, drivers, processadores e datatypes) e inspecao heuristica de aderencia a WPP.
+É o núcleo operacional de fila. Centraliza criação, atualização, exclusão, enumeração de recursos (filas, portas, drivers, processadores e datatypes) e inspeção heurística de aderência a WPP.
 
-Padroes tecnicos importantes:
+Padrões técnicos importantes:
 
-- APIs de enumeracao usam duas chamadas (descobrir tamanho, depois ler);
-- erros Win32 sao convertidos para mensagens acionaveis;
-- update de fila protege ponteiros sensiveis (`pDevMode`, `pSecurityDescriptor`);
-- em Xcv, sucesso de transporte e sucesso funcional sao validados separadamente.
+- APIs de enumeração usam duas chamadas (descobrir tamanho, depois ler);
+- erros Win32 são convertidos para mensagens acionáveis;
+- update de fila protege ponteiros sensíveis (`pDevMode`, `pSecurityDescriptor`);
+- em Xcv, sucesso de transporte e sucesso funcional são validados separadamente.
 
-#### 5.1.1 Padrao de buffer dupla-chamada
+#### 5.1.1 Padrão de buffer dupla-chamada
 
-Quase todas as APIs de enumeracao do spooler (`EnumPorts`, `EnumPrinters`, `EnumPrinterDrivers`, etc.) seguem o mesmo contrato: a primeira chamada descobre quantos bytes sao necessarios; a segunda preenche o buffer real. Esse padrao se repete em `ListPorts`, `ListDrivers`, `ListPrintProcessors`, `ListDataTypes` e `ListQueues`.
+Quase todas as APIs de enumeração do spooler (`EnumPorts`, `EnumPrinters`, `EnumPrinterDrivers`, etc.) seguem o mesmo contrato: a primeira chamada descobre quantos bytes são necessários; a segunda preenche o buffer real. Esse padrão se repete em `ListPorts`, `ListDrivers`, `ListPrintProcessors`, `ListDataTypes` e `ListQueues`.
 
 ```csharp
-// 1a chamada: descobre tamanho necessario
+// 1a chamada: descobre tamanho necessário
 if (!NativeMethods.EnumPorts(null, 1, IntPtr.Zero, 0, out var requiredBufferSize, out _))
 {
     var error = Marshal.GetLastWin32Error();
-    // ERROR_INSUFFICIENT_BUFFER e esperado aqui — nao e falha real
+    // ERROR_INSUFFICIENT_BUFFER é esperado aqui — não é falha real
     if (error != NativeMethods.ERROR_INSUFFICIENT_BUFFER && error != NativeMethods.ERROR_SUCCESS)
     {
         throw new Win32Exception(error, "EnumPorts buffer query failed.");
     }
 }
 
-// Sem bytes necessarios = sem portas
+// Sem bytes necessários = sem portas
 if (requiredBufferSize == 0)
 {
     return [];
@@ -200,7 +200,7 @@ try
         ThrowLastWin32("EnumPorts failed.");
     }
 
-    // Itera as structs PORT_INFO_1 no bloco de memoria
+    // Itera as structs PORT_INFO_1 no bloco de memória
     var portInfoStructSize = Marshal.SizeOf<NativeMethods.PORT_INFO_1>();
     var ports = new List<string>((int)returnedPortCount);
     for (var index = 0; index < returnedPortCount; index++)
@@ -223,11 +223,11 @@ finally
 }
 ```
 
-O mesmo padrao e aplicado para drivers (com `DRIVER_INFO_2`), processadores (`PRINTPROCESSOR_INFO_1`), datatypes (`DATATYPES_INFO_1`) e filas (`PRINTER_INFO_2` via `EnumPrinters`).
+O mesmo padrão é aplicado para drivers (com `DRIVER_INFO_2`), processadores (`PRINTPROCESSOR_INFO_1`), datatypes (`DATATYPES_INFO_1`) e filas (`PRINTER_INFO_2` via `EnumPrinters`).
 
-#### 5.1.2 Criacao de fila no spooler
+#### 5.1.2 Criação de fila no spooler
 
-A criacao monta uma `PRINTER_INFO_2`, aloca memoria nao gerenciada, chama `AddPrinter` e garante liberacao de recursos em qualquer saida.
+A criação monta uma `PRINTER_INFO_2`, aloca memória não gerenciada, chama `AddPrinter` e garante liberação de recursos em qualquer saída.
 
 ```csharp
 public void CreateQueue(
@@ -285,19 +285,19 @@ public void CreateQueue(
 }
 ```
 
-Pontos de atencao:
-- `pDevMode` e `pSecurityDescriptor` sao `IntPtr.Zero` porque a criacao delega esses detalhes ao driver/sistema;
+Pontos de atenção:
+- `pDevMode` e `pSecurityDescriptor` são `IntPtr.Zero` porque a criação delega esses detalhes ao driver/sistema;
 - `PRINTER_ATTRIBUTE_QUEUED` ativa spooling na fila;
-- `DestroyStructure` e necessario antes de `FreeHGlobal` para liberar corretamente os ponteiros internos da struct.
+- `DestroyStructure` é necessário antes de `FreeHGlobal` para liberar corretamente os ponteiros internos da struct.
 
-#### 5.1.3 Criacao de porta WSD via Xcv
+#### 5.1.3 Criação de porta WSD via Xcv
 
-O fluxo de `AddWsdPort` usa o canal administrativo `XcvMonitor` e faz validacao dupla: sucesso da chamada Win32 e sucesso funcional do monitor.
+O fluxo de `AddWsdPort` usa o canal administrativo `XcvMonitor` e faz validação dupla: sucesso da chamada Win32 e sucesso funcional do monitor.
 
 ```csharp
 public void AddWsdPort(string portName)
 {
-    // Idempotencia: evita criar porta que ja existe
+    // Idempotência: evita criar porta que já existe
     if (ListPorts().Any(p => string.Equals(p, portName, StringComparison.OrdinalIgnoreCase)))
     {
         Console.WriteLine($"Port '{portName}' already exists.");
@@ -334,7 +334,7 @@ public void AddWsdPort(string portName)
             ThrowLastWin32("XcvData(AddPort) call failed.");
         }
 
-        // Validacao funcional: mesmo com chamada OK, o monitor pode rejeitar
+        // Validação funcional: mesmo com chamada OK, o monitor pode rejeitar
         if (xcvCommandStatus != NativeMethods.ERROR_SUCCESS)
         {
             if (xcvCommandStatus == NativeMethods.ERROR_NOT_SUPPORTED)
@@ -358,20 +358,20 @@ public void AddWsdPort(string portName)
 }
 ```
 
-O ponto central e a distincao entre **sucesso de transporte** (`XcvData` retornou `true`) e **sucesso funcional** (`xcvCommandStatus == ERROR_SUCCESS`). Isso evita falsos positivos em ambientes onde o monitor aceita o comando mas rejeita a operacao.
+O ponto central é a distinção entre **sucesso de transporte** (`XcvData` retornou `true`) e **sucesso funcional** (`xcvCommandStatus == ERROR_SUCCESS`). Isso evita falsos positivos em ambientes onde o monitor aceita o comando mas rejeita a operação.
 
 #### 5.1.4 Update parcial de fila
 
-O update le o estado atual da fila, zera ponteiros sensiveis, aplica apenas campos informados e persiste via `SetPrinter`.
+O update lê o estado atual da fila, zera ponteiros sensíveis, aplica apenas campos informados e persiste via `SetPrinter`.
 
 ```csharp
 public void UpdateQueue(string queueName, string? newQueueName, string? newDriverName,
     string? newPortName, string? comment, string? location)
 {
-    // Le estado atual completo (PRINTER_INFO_2 nivel 2)
+    // Le estado atual completo (PRINTER_INFO_2 nível 2)
     var queueInfo = GetQueueInfo(queueName);
 
-    // Zera ponteiros sensiveis para evitar reutilizacao indevida de dados nativos
+    // Zera ponteiros sensíveis para evitar reutilização indevida de dados nativos
     queueInfo.pDevMode = IntPtr.Zero;
     queueInfo.pSecurityDescriptor = IntPtr.Zero;
 
@@ -430,14 +430,14 @@ public void UpdateQueue(string queueName, string? newQueueName, string? newDrive
 }
 ```
 
-Pontos de atencao:
-- `pDevMode` e `pSecurityDescriptor` sao zerados propositalmente: o `PRINTER_INFO_2` lido contem ponteiros nativos que ficam invalidos fora do buffer original. Repassa-los ao `SetPrinter` causaria corrupcao de memoria;
-- o update e parcial: campos `null` nao alteram o valor existente;
-- o handle e aberto com `PRINTER_ACCESS_ADMINISTER`, necessario para `SetPrinter`.
+Pontos de atenção:
+- `pDevMode` e `pSecurityDescriptor` são zerados propositalmente: o `PRINTER_INFO_2` lido contém ponteiros nativos que ficam inválidos fora do buffer original. Repassa-los ao `SetPrinter` causaria corrupção de memória;
+- o update é parcial: campos `null` não alteram o valor existente;
+- o handle é aberto com `PRINTER_ACCESS_ADMINISTER`, necessário para `SetPrinter`.
 
-#### 5.1.5 Inspecao heuristica de fila
+#### 5.1.5 Inspeção heurística de fila
 
-A classificacao WPP combina tres fontes de evidencia: estado global de WPP, padrao do nome de porta e dados APMON (quando disponiveis).
+A classificação WPP combina três fontes de evidência: estado global de WPP, padrão do nome de porta e dados APMON (quando disponíveis).
 
 ```csharp
 public QueueInspectionResult InspectQueue(string queueName)
@@ -449,7 +449,7 @@ public QueueInspectionResult InspectQueue(string queueName)
 
     var diagnosticDetails = new List<string>();
 
-    // Evidencia opcional: APMON enriquece a classificacao quando disponivel
+    // Evidência opcional: APMON enriquece a classificação quando disponível
     var apPortInfo = TryGetApPortInfo(portName);
     if (apPortInfo is not null)
     {
@@ -462,19 +462,19 @@ public QueueInspectionResult InspectQueue(string queueName)
 
     var classification = WppQueueClassification.Indeterminate;
 
-    // WPP global habilitado + sinais de porta moderna -> provavel WPP
+    // WPP global habilitado + sinais de porta moderna -> provável WPP
     if (globalWppStatus == WppStatus.Enabled && (isWsdPort || (apPortInfo?.Protocol is 1 or 2)))
     {
         classification = WppQueueClassification.LikelyWpp;
         diagnosticDetails.Insert(0, "Global WPP is enabled and queue indicates modern monitored port.");
     }
-    // WPP global desabilitado prevalece como provavel nao-WPP
+    // WPP global desabilitado prevalece como provável não-WPP
     else if (globalWppStatus == WppStatus.Disabled)
     {
         classification = WppQueueClassification.LikelyNotWpp;
         diagnosticDetails.Insert(0, "Global WPP is disabled.");
     }
-    // Global ativo sem sinal de porta moderna -> inconsistencia
+    // Global ativo sem sinal de porta moderna -> inconsistência
     else if (globalWppStatus == WppStatus.Enabled && !isWsdPort)
     {
         diagnosticDetails.Insert(0, "Global WPP is enabled but queue port does not look like WSD.");
@@ -493,18 +493,18 @@ public QueueInspectionResult InspectQueue(string queueName)
 }
 ```
 
-A arvore de decisao resumida:
+A árvore de decisão resumida:
 
-| Status Global | Porta WSD ou APMON WSD/IPP | Classificacao |
+| Status Global | Porta WSD ou APMON WSD/IPP | Classificação |
 |---|---|---|
 | `Enabled` | Sim | `LikelyWpp` |
-| `Enabled` | Nao | `Indeterminate` |
+| `Enabled` | Não | `Indeterminate` |
 | `Disabled` | Qualquer | `LikelyNotWpp` |
 | `Unknown` | Qualquer | `Indeterminate` |
 
-#### 5.1.6 Coleta de evidencias APMON via XcvPort
+#### 5.1.6 Coleta de evidências APMON via XcvPort
 
-O `TryGetApPortInfo` e um helper resiliente: abre um canal `XcvPort` para a porta e executa `GetAPPortInfo`. Se qualquer etapa falhar, retorna `null` sem interromper a inspecao.
+O `TryGetApPortInfo` é um helper resiliente: abre um canal `XcvPort` para a porta e executa `GetAPPortInfo`. Se qualquer etapa falhar, retorna `null` sem interromper a inspeção.
 
 ```csharp
 private static ApPortData? TryGetApPortInfo(string portName)
@@ -523,7 +523,7 @@ private static ApPortData? TryGetApPortInfo(string portName)
 
     var xcvPortName = $",XcvPort {portName}";
 
-    // Se XcvPort nao abre, a inspecao segue sem evidencia APMON
+    // Se XcvPort não abre, a inspeção segue sem evidência APMON
     if (!NativeMethods.OpenPrinter(xcvPortName, out var xcvHandle, ref printerDefaults))
     {
         return null;
@@ -571,17 +571,17 @@ private static ApPortData? TryGetApPortInfo(string portName)
 ```
 
 A struct `AP_PORT_DATA_1` retornada pelo monitor traz:
-- `Version`: versao da estrutura;
+- `Version`: versão da estrutura;
 - `Protocol`: 1 = WSD, 2 = IPP;
-- `DeviceOrServiceUrl`: URL do dispositivo/servico (260 chars fixos no layout nativo).
+- `DeviceOrServiceUrl`: URL do dispositivo/serviço (260 chars fixos no layout nativo).
 
 ### 5.2 WppRegistryService
 
-Resolve o estado global WPP lendo valores de politica no Registry do Windows (HKLM).
+Resolve o estado global WPP lendo valores de política no Registry do Windows (HKLM).
 
-#### 5.2.1 Definicao dos probes e regra de decisao
+#### 5.2.1 Definição dos probes e regra de decisão
 
-O servico define uma lista de "probes" — combinacoes de caminho de registro + nome de valor — com os valores esperados para habilitado e desabilitado. A iteracao percorre todos os probes e aplica uma estrategia de fallback com prioridade para `Enabled`.
+O serviço define uma lista de "probes" — combinações de caminho de registro + nome de valor — com os valores esperados para habilitado e desabilitado. A iteração percorre todos os probes e aplica uma estratégia de fallback com prioridade para `Enabled`.
 
 ```csharp
 private static readonly PolicyStatusCheck[] StatusChecks =
@@ -605,11 +605,11 @@ private sealed record PolicyStatusCheck(
     int DisabledWhen);
 ```
 
-Essa estrutura permite adicionar novos probes sem alterar a logica de decisao.
+Essa estrutura permite adicionar novos probes sem alterar a lógica de decisão.
 
 #### 5.2.2 Fluxo completo de `GetWppStatus`
 
-A rotina percorre os probes em sequencia. A regra e: `Enabled` retorna imediatamente, `Disabled` e guardado como candidato (porque um probe posterior pode indicar `Enabled`), e valores fora do mapeamento retornam `Unknown`.
+A rotina percorre os probes em sequência. A regra é: `Enabled` retorna imediatamente, `Disabled` é guardado como candidato (porque um probe posterior pode indicar `Enabled`), e valores fora do mapeamento retornam `Unknown`.
 
 ```csharp
 public WppStatusResult GetWppStatus()
@@ -620,7 +620,7 @@ public WppStatusResult GetWppStatus()
     {
         using var key = Registry.LocalMachine.OpenSubKey(statusCheck.RegistryPath, writable: false);
 
-        // Se a chave nao existe, tenta o proximo probe
+        // Se a chave não existe, tenta o próximo probe
         if (key is null)
         {
             continue;
@@ -628,13 +628,13 @@ public WppStatusResult GetWppStatus()
 
         var rawValue = key.GetValue(statusCheck.PolicyValueName);
 
-        // Se o valor nao existe neste probe, tenta o proximo
+        // Se o valor não existe neste probe, tenta o próximo
         if (rawValue is null)
         {
             continue;
         }
 
-        // So aceita tipos que conseguimos converter com seguranca
+        // Só aceita tipos que conseguimos converter com segurança
         if (!TryConvertToInt(rawValue, out var numericValue))
         {
             return new WppStatusResult(
@@ -679,7 +679,7 @@ public WppStatusResult GetWppStatus()
         return disabledCandidate;
     }
 
-    // Nenhum probe encontrou valor -> assume Disabled por padrao
+    // Nenhum probe encontrou valor -> assume Disabled por padrão
     return new WppStatusResult(
         WppStatus.Disabled,
         "No known WPP Registry value found.",
@@ -688,19 +688,19 @@ public WppStatusResult GetWppStatus()
 }
 ```
 
-Cenarios de saida resumidos:
+Cenários de saída resumidos:
 
 | Probe encontrado | Valor lido | Resultado |
 |---|---|---|
 | Sim | Igual a `EnabledWhen` | `Enabled` (retorno imediato) |
 | Sim | Igual a `DisabledWhen` | Guarda candidato `Disabled`, continua |
 | Sim | Outro inteiro | `Unknown` (retorno imediato) |
-| Sim | Tipo nao conversivel | `Unknown` (retorno imediato) |
-| Nenhum probe com valor | — | `Disabled` por padrao |
+| Sim | Tipo não conversível | `Unknown` (retorno imediato) |
+| Nenhum probe com valor | — | `Disabled` por padrão |
 
-#### 5.2.3 Conversao segura de valor do Registry
+#### 5.2.3 Conversão segura de valor do Registry
 
-O Registry pode armazenar o valor como `int` (DWORD) ou como `string` (texto numerico). O helper normaliza os dois formatos.
+O Registry pode armazenar o valor como `int` (DWORD) ou como `string` (texto numérico). O helper normaliza os dois formatos.
 
 ```csharp
 private static bool TryConvertToInt(object rawValue, out int numericValue)
@@ -712,7 +712,7 @@ private static bool TryConvertToInt(object rawValue, out int numericValue)
         return true;
     }
 
-    // Fallback: alguns ambientes armazenam como texto numerico
+    // Fallback: alguns ambientes armazenam como texto numérico
     if (rawValue is string stringValue && int.TryParse(stringValue, out var parsedValue))
     {
         numericValue = parsedValue;
@@ -724,28 +724,28 @@ private static bool TryConvertToInt(object rawValue, out int numericValue)
 }
 ```
 
-Se o tipo nao for `int` nem `string` parseable (por exemplo, `byte[]` de um valor REG_BINARY), `TryConvertToInt` retorna `false` e o chamador trata como `Unknown`.
+Se o tipo não for `int` nem `string` parseável (por exemplo, `byte[]` de um valor REG_BINARY), `TryConvertToInt` retorna `false` e o chamador trata como `Unknown`.
 
 ### 5.3 PrintTicketService
 
-Le e atualiza ticket com estrategia de compatibilidade por reflection em `System.Printing`.
+Lê e atualiza ticket com estratégia de compatibilidade por reflexão em `System.Printing`.
 
 Por que essa escolha ajuda:
 
-- reduz acoplamento forte a variacoes de runtime/driver;
-- permite fallback mais suave quando o ambiente nao suporta um caminho especifico;
-- retorna resultado funcional com contexto ao inves de quebrar todo o fluxo.
+- reduz acoplamento forte a variações de runtime/driver;
+- permite fallback mais suave quando o ambiente não suporta um caminho específico;
+- retorna resultado funcional com contexto ao invés de quebrar todo o fluxo.
 
 #### 5.3.1 Leitura de ticket (Default e User)
 
-O fluxo de leitura verifica disponibilidade de `System.Printing` por reflection, abre `LocalPrintServer`, localiza a fila e extrai propriedades do ticket. A mesma estrutura e usada para `DefaultPrintTicket` e `UserPrintTicket`.
+O fluxo de leitura verifica disponibilidade de `System.Printing` por reflexão, abre `LocalPrintServer`, localizationa a fila e extrai propriedades do ticket. A mesma estrutura é usada para `DefaultPrintTicket` e `UserPrintTicket`.
 
 ```csharp
 public PrintTicketInfoResult GetDefaultTicketInfo(string queueName)
 {
     var ticketSettings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-    // Verifica se System.Printing esta disponivel no runtime
+    // Verifica se System.Printing está disponível no runtime
     var printServerType = Type.GetType(
         "System.Printing.LocalPrintServer, System.Printing", throwOnError: false);
     if (printServerType is null)
@@ -785,7 +785,7 @@ public PrintTicketInfoResult GetDefaultTicketInfo(string queueName)
                 queueName, false, "DefaultPrintTicket is not available.", ticketSettings);
         }
 
-        // Extrai propriedades conhecidas do ticket por reflection (best-effort)
+        // Extrai propriedades conhecidoas do ticket por reflexão (best-effort)
         ReadTicketAttribute(defaultTicket, "OutputColor", ticketSettings);
         ReadTicketAttribute(defaultTicket, "PageMediaSize", ticketSettings);
         ReadTicketAttribute(defaultTicket, "PageOrientation", ticketSettings);
@@ -817,11 +817,11 @@ public PrintTicketInfoResult GetDefaultTicketInfo(string queueName)
 }
 ```
 
-A versao para `GetUserTicketInfo` e identica, substituindo apenas `"DefaultPrintTicket"` por `"UserPrintTicket"` na obtencao da property e na chamada a `GetPrintQueue`.
+A versão para `GetUserTicketInfo` é idêntica, substituindo apenas `"DefaultPrintTicket"` por `"UserPrintTicket"` na obtenção da property e na chamada a `GetPrintQueue`.
 
 #### 5.3.2 Fluxo interno de update (`UpdatePrintTicketInternal`)
 
-Os metodos publicos `UpdateDefaultTicket` e `UpdateUserTicket` delegam para um fluxo interno comum que: prepara atributos, abre servidor/fila, aplica diferencas, faz `Commit()` e retorna pedido vs aplicado.
+Os métodos públicos `UpdateDefaultTicket` e `UpdateUserTicket` delegam para um fluxo interno comum que: prepara atributos, abre servidor/fila, aplica diferenças, faz `Commit()` e retorna pedido vs aplicado.
 
 ```csharp
 public PrintTicketUpdateResult UpdateDefaultTicket(string queueName, PrintTicketUpdateRequest request)
@@ -867,7 +867,7 @@ private PrintTicketUpdateResult UpdatePrintTicketInternal(
             return new PrintTicketUpdateResult(
                 queueName, ticketScope, false,
                 $"Queue '{queueName}' not found.",
-                requestedSettings, new Dictionary<string, string>());
+                requestedSettings, new Dictionary<string, string());
 
         var queueType = queue.GetType();
         var ticketPropertyInfo = queueType.GetProperty(ticketPropertyName);
@@ -875,17 +875,17 @@ private PrintTicketUpdateResult UpdatePrintTicketInternal(
             return new PrintTicketUpdateResult(
                 queueName, ticketScope, false,
                 $"Print ticket property '{ticketPropertyName}' not found.",
-                requestedSettings, new Dictionary<string, string>());
+                requestedSettings, new Dictionary<string, string());
 
-        // 3) Le o ticket alvo
+        // 3) Lê o ticket alvo
         var targetTicket = ticketPropertyInfo.GetValue(queue);
         if (targetTicket is null)
             return new PrintTicketUpdateResult(
                 queueName, ticketScope, false,
                 $"Print ticket '{ticketPropertyName}' not found.",
-                requestedSettings, new Dictionary<string, string>());
+                requestedSettings, new Dictionary<string, string());
 
-        // 4) Aplica apenas diferencas reais
+        // 4) Aplica apenas diferenças reais
         bool hasChanges = false;
         hasChanges |= WriteTicketAttribute(targetTicket, "Duplexing", request.Duplexing);
         hasChanges |= WriteTicketAttribute(targetTicket, "OutputColor", request.OutputColor);
@@ -918,7 +918,7 @@ private PrintTicketUpdateResult UpdatePrintTicketInternal(
             }
         }
 
-        // 6) Le valores efetivos apos commit e retorna pedido x aplicado
+        // 6) Lê valores efetivos após commit e retorna pedido x aplicado
         var appliedSettings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         ReadTicketAttribute(targetTicket, "Duplexing", appliedSettings);
         ReadTicketAttribute(targetTicket, "OutputColor", appliedSettings);
@@ -940,7 +940,7 @@ private PrintTicketUpdateResult UpdatePrintTicketInternal(
         return new PrintTicketUpdateResult(
             queueName, ticketScope, false,
             $"Exception during PrintTicket update: {error}.",
-            requestedSettings, new Dictionary<string, string>());
+            requestedSettings, new Dictionary<string, string());
     }
     finally
     {
@@ -950,11 +950,11 @@ private PrintTicketUpdateResult UpdatePrintTicketInternal(
 }
 ```
 
-Regra pratica: sempre comparar `Requested` e `AppliedValues` no resultado para validar o que o driver realmente aceitou.
+Regra prática: sempre comparar `Requested` e `AppliedValues` no resultado para validar o que o driver realmente aceitou.
 
-#### 5.3.3 Escrita de atributo com deteccao de mudanca (`WriteTicketAttribute`)
+#### 5.3.3 Escrita de atributo com detecção de mudança (`WriteTicketAttribute`)
 
-O metodo compara o valor atual com o solicitado e so aplica quando ha diferenca real, evitando commits desnecessarios.
+O método compara o valor atual com o solicitado e só aplica quando há diferença real, evitando commits desnecessários.
 
 ```csharp
 private static bool WriteTicketAttribute(object? ticket, string propertyName, string? requestedValue)
@@ -995,9 +995,9 @@ private static bool WriteTicketAttribute(object? ticket, string propertyName, st
 }
 ```
 
-O retorno `bool` e acumulado via `|=` no fluxo principal para determinar se houve pelo menos uma mudanca que justifique o `Commit()`.
+O retorno `bool` é acumulado via `|=` no fluxo principal para determinar se houve pelo menos uma mudança que justifique o `Commit()`.
 
-#### 5.3.4 Conversao de tipo para propriedades do ticket (`ConvertIfPossible`)
+#### 5.3.4 Conversão de tipo para propriedades do ticket (`ConvertIfPossible`)
 
 O ticket de `System.Printing` usa enums (como `Duplexing`, `OutputColor`), tipos primitivos e `Nullable<T>`. O helper converte a string do request para o tipo real da propriedade.
 
@@ -1036,13 +1036,13 @@ private static object? ConvertIfPossible(Type targetType, string rawValue)
 }
 ```
 
-Isso permite que o consumidor envie `"TwoSidedLongEdge"` como string e o metodo resolva para o enum `System.Printing.Duplexing.TwoSidedLongEdge` automaticamente.
+Isso permite que o consumidor envie `"TwoSidedLongEdge"` como string e o método resolva para o enum `System.Printing.Duplexing.TwoSidedLongEdge` automaticamente.
 
-#### 5.3.5 Criacao de `LocalPrintServer` e obtencao de fila por reflection
+#### 5.3.5 Criação de `LocalPrintServer` e obtenção de fila por reflexão
 
-Como `System.Printing` e carregado por reflection, a criacao do servidor e a obtencao da fila usam estrategias de fallback para maximizar compatibilidade.
+Como `System.Printing` é carregado por reflexão, a criação do servidor e a obtenção da fila usam estratégias de fallback para maximizar compatibilidade.
 
-**Criacao do servidor:**
+**Criação do servidor:**
 
 ```csharp
 private static object? CreateLocalPrintServer(Type printServerType, string requestedAccessName)
@@ -1058,7 +1058,7 @@ private static object? CreateLocalPrintServer(Type printServerType, string reque
         var desiredAccess = Enum.Parse(desiredAccessType, requestedAccessName, ignoreCase: true);
         var ctor = printServerType.GetConstructor(new[] { desiredAccessType });
         if (ctor is null)
-            return Activator.CreateInstance(printServerType); // Fallback: construtor padrao
+            return Activator.CreateInstance(printServerType); // Fallback: construtor padrão
 
         return ctor.Invoke(new[] { desiredAccess });
     }
@@ -1069,7 +1069,7 @@ private static object? CreateLocalPrintServer(Type printServerType, string reque
 }
 ```
 
-**Obtencao da fila (3 estrategias em cascata):**
+**Obtenção da fila (3 estratégias em cascata):**
 
 ```csharp
 private static object? GetPrintQueue(
@@ -1081,7 +1081,7 @@ private static object? GetPrintQueue(
     var desiredAccessType = Type.GetType(
         "System.Printing.PrintSystemDesiredAccess, System.Printing", throwOnError: false);
 
-    // Estrategia 1: new PrintQueue(printServer, queueName, desiredAccess)
+    // Estratégia 1: new PrintQueue(printServer, queueName, desiredAccess)
     if (desiredAccessType is not null)
     {
         var desiredAccess = Enum.Parse(desiredAccessType, requestedAccessName, ignoreCase: true);
@@ -1100,7 +1100,7 @@ private static object? GetPrintQueue(
         }
     }
 
-    // Estrategia 2: printServer.GetPrintQueue(queueName, propertiesFilter)
+    // Estratégia 2: printServer.GetPrintQueue(queueName, propertiesFilter)
     var getQueueWithProperties = printServerType.GetMethod(
         "GetPrintQueue", new[] { typeof(string), typeof(string[]) });
     if (getQueueWithProperties is not null)
@@ -1109,20 +1109,20 @@ private static object? GetPrintQueue(
         return getQueueWithProperties.Invoke(printServer, new object[] { queueName, properties });
     }
 
-    // Estrategia 3: printServer.GetPrintQueue(queueName)
+    // Estratégia 3: printServer.GetPrintQueue(queueName)
     var getQueueDefault = printServerType.GetMethod(
         "GetPrintQueue", new[] { typeof(string) });
     return getQueueDefault?.Invoke(printServer, new object[] { queueName });
 }
 ```
 
-As 3 estrategias em ordem de prioridade:
+As 3 estratégias em ordem de prioridade:
 
-1. **Construtor direto com acesso explicito** — garante permissao adequada para leitura/escrita;
-2. **`GetPrintQueue` com filtro de propriedades** — carrega apenas as propriedades necessarias;
-3. **`GetPrintQueue` simples** — fallback final quando as sobrecargas anteriores nao existem.
+1. **Construtor direto com acesso explícito** — garante permissão adequada para leitura/escrita;
+2. **`GetPrintQueue` com filtro de propriedades** — carrega apenas as propriedades necessárias;
+3. **`GetPrintQueue` simples** — fallback final quando as sobrecargas anteriores não existem.
 
-Essa cascata torna o servico resiliente a diferencas entre versoes de runtime e configuracoes de ambiente.
+Essa cascata torna o serviço resiliente a diferenças entre versões de runtime e configurações de ambiente.
 
 ## 6) Como interpretar os resultados
 
@@ -1130,8 +1130,8 @@ Essa cascata torna o servico resiliente a diferencas entre versoes de runtime e 
 
 - `Status`: estado final (`Enabled`, `Disabled`, `Unknown`)
 - `Source`: origem da leitura
-- `Details`: explicacao tecnica
-- `RawValue`: valor bruto, quando aplicavel
+- `Details`: explicação técnica
+- `RawValue`: valor bruto, quando aplicável
 
 ### `QueueInspectionResult`
 
@@ -1140,24 +1140,24 @@ Essa cascata torna o servico resiliente a diferencas entre versoes de runtime e 
 - `Classification`
 - `Details`
 
-Leitura pratica: bom para inventario e triagem rapida de filas.
+Leitura prática: bom para inventário e triagem rápida de filas.
 
 ### `PrintTicketInfoResult`
 
-- `Available`: leitura foi possivel
+- `Available`: leitura foi possível
 - `Details`: contexto da tentativa
 - `Attributes`: snapshot de propriedades relevantes
 
 ### `PrintTicketUpdateResult`
 
-- `Applied`: houve alteracao efetiva
-- `Requested`: intencao enviada
+- `Applied`: houve alteração efetiva
+- `Requested`: intenção enviada
 - `AppliedValues`: resultado observado
 - `Details`: mensagem final da tentativa
 
-Leitura pratica: valida diferenca entre o que foi solicitado e o que o driver realmente sustentou.
+Leitura prática: valida diferença entre o que foi solicitado e o que o driver realmente sustentou.
 
-## 7) Exemplo unico de execucao
+## 7) Exemplo único de execução
 
 ```csharp
 using WppQueuePoc.Abstractions;
@@ -1184,26 +1184,26 @@ var req = new PrintTicketUpdateRequest("TwoSidedLongEdge", "Monochrome", "Portra
 var after = ticketService.UpdateUserTicket(queue, req);
 ```
 
-Observacao: em cenario real, valide listas antes de indexar e trate excecoes operacionais.
+Observação: em cenário real, valide listas antes de indexar e trate exceções operacionais.
 
 ## 8) Erros comuns e leitura correta
 
-- `ERROR_ACCESS_DENIED`: falta privilegio para operacao administrativa.
-- `ERROR_INSUFFICIENT_BUFFER`: comportamento esperado na primeira chamada de enumeracao.
-- `ERROR_NOT_SUPPORTED`: comando nao suportado no monitor/driver/porta daquele ambiente.
+- `ERROR_ACCESS_DENIED`: falta privilégio para operação administrativa.
+- `ERROR_INSUFFICIENT_BUFFER`: comportamento esperado na primeira chamada de enumeração.
+- `ERROR_NOT_SUPPORTED`: comando não suportado no monitor/driver/porta daquele ambiente.
 
 ## 9) Limites conhecidos
 
-- classificacao WPP por fila e heuristica, nao certificacao formal;
-- resultado depende de versao de Windows, driver e permissao local;
-- nem todo update de ticket e aceito integralmente pelo driver;
+- classificação WPP por fila é heurística, não certificação formal;
+- resultado depende de versão de Windows, driver e permissão local;
+- nem todo update de ticket é aceito integralmente pelo driver;
 - ambientes diferentes podem acionar fallbacks diferentes em `System.Printing`.
 
-## 10) Checklist rapido de validacao
+## 10) Checklist rápido de validação
 
 1. consultar status global WPP;
-2. listar recursos disponiveis (ports, drivers, processors, datatypes);
-3. criar fila com combinacao valida;
+2. listar recursos disponíveis (ports, drivers, processors, datatypes);
+3. criar fila com combinação válida;
 4. inspecionar fila;
 5. ler ticket default e user;
 6. aplicar update e comparar pedido x aplicado;
@@ -1213,4 +1213,3 @@ Observacao: em cenario real, valide listas antes de indexar e trate excecoes ope
 ## 11) POC
 
 Link da POC: https://github.com/tiagobuchanellindd/WppQueuePoc
-
