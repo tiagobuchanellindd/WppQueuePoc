@@ -1,10 +1,10 @@
 # Enforcement ativo de PrintTicket via Win32 API: arquitetura de monitoramento reativo
 
-Este estudo apresenta uma solucao de enforcement ativo para configuracoes de impressao no Windows. Ele combina monitoramento de eventos via Win32 API com atualizacao automatica de PrintTicket para manter configuracoes alinhadas com politicas organizacionais.
+Este estudo apresenta uma solucao de enforcement ativo para configuracões de impressao no Windows. Ele combina monitoramento de eventos via Win32 API com atualizacao automatica de PrintTicket para manter configuracoes alinhadas com politicas organizacionais.
 
 ## 1) Contexto e problema
 
-Em ambientes corporativos, ha necessidade de garantir que impressoras mantenham configuracoesfixas:
+Em ambientes corporativos, ha necessidade de garantir que impressoras mantenham configuracões fixas, como por exemplo:
 
 - duplex forcado (frente e verso)
 - cor forcada (monochrome)
@@ -377,8 +377,12 @@ public event EventHandler<Exception>? Error;        // Excecoes
 
 ## 12) Estudo relacionado
 
-Este estudo complementa o estudo geral de PrintTicketService (docs/estudo/PrintTicketService). O PrintTicketService fornece as capacidades de leitura/escrita que este enforcement consome.
+Este estudo complementa o estudo geral de PrintTicketService (docs/estudo/PrintTicketService). 
+O PrintTicketService fornece as capacidades de leitura/escrita que este enforcement consome.
 
 ## 13) POC
 
 Link da POC: https://github.com/tiagobuchanellindd/WppQueuePoc
+
+## 14) Testes de Monitoramento
+![teste.gif](/.attachments/teste-a0ff081d-1f27-4176-9957-3d4de9678f9a.gif)
