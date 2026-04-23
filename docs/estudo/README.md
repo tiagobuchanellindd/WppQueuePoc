@@ -44,6 +44,17 @@ Padrao adotado:
   - `docs/estudo/PrintTicketService/estudo-05-create-local-print-server-e-get-print-queue.md`
   - `docs/estudo/PrintTicketService/estudo-06-cleanup-e-diagnostico.md`
 
+- `WppQueuePoc/Services/PrinterPolicyEnforcer.cs`
+  - `docs/estudo/PrinterPolicyEnforcer/estudo-01-visao-geral.md`
+  - `docs/estudo/PrinterPolicyEnforcer/estudo-02-monitor-loop-e-eventos-win32.md`
+  - `docs/estudo/PrinterPolicyEnforcer/estudo-03-enforcement-worker-loop.md`
+  - `docs/estudo/PrinterPolicyEnforcer/estudo-04-policy-e-contratos.md`
+
+- `WppQueuePoc/Services/PrintTicketEnforcementHelper.cs`
+  - `docs/estudo/PrintTicketEnforcementHelper/estudo-01-visao-geral.md`
+  - `docs/estudo/PrintTicketEnforcementHelper/estudo-02-fluxo-de-comparacao.md`
+  - `docs/estudo/PrintTicketEnforcementHelper/estudo-03-aplicacao-de-mudancas.md`
+
 ## Como usar este indice
 
 - comece pelo `README.md` da trilha desejada;
